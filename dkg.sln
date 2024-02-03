@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34309.116
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dkg", "dkg\dkg.csproj", "{EA53104D-366D-4F82-A1B0-6367E0883853}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "testDkg", "testDkg\testDkg.csproj", "{027FD154-6C51-4CB6-A825-6DE15830D895}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EA53104D-366D-4F82-A1B0-6367E0883853}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA53104D-366D-4F82-A1B0-6367E0883853}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA53104D-366D-4F82-A1B0-6367E0883853}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA53104D-366D-4F82-A1B0-6367E0883853}.Release|Any CPU.Build.0 = Release|Any CPU
+		{027FD154-6C51-4CB6-A825-6DE15830D895}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{027FD154-6C51-4CB6-A825-6DE15830D895}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{027FD154-6C51-4CB6-A825-6DE15830D895}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{027FD154-6C51-4CB6-A825-6DE15830D895}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {FF78BA52-8E5D-4006-8D8C-197F0C54CD3E}
+	EndGlobalSection
+EndGlobal
