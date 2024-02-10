@@ -27,18 +27,18 @@ namespace dkg
         IScalar SetInt64(Int64 v);
         // Set to the additive identity (0).
         IScalar Zero();
-        // Set to the modular sum of this and s2.
-        IScalar Add(IScalar s1, IScalar s2);
-        // Set to the modular difference a - b.
-        IScalar Sub(IScalar a, IScalar b);
+        // Modular sum of this and s2.
+        IScalar Add(IScalar b);
+        // Modular differenceb.
+        IScalar Sub(IScalar b);
         // Set to the modular negation of scalar.
         IScalar Neg();
         // Set to the multiplicative identity (1).
         IScalar One();
-        // Set to the modular product of scalars a and b.
-        IScalar Mul(IScalar a, IScalar b);
-        // Set to the modular division of scalar a by scalar b.
-        IScalar Div(IScalar a, IScalar b);
+        // Set to the modular product of scalars
+        IScalar Mul(IScalar b);
+        // Set to the modular division of scalars
+        IScalar Div(IScalar b);
         // Set to the modular inverse of scalar.
         IScalar Inv();
         // Set to a fresh random or pseudo-random scalar.
@@ -72,14 +72,13 @@ namespace dkg
         // Clone clones the underlying point.
         IPoint Clone();
         // Add points so that their scalars add homomorphically.
-        IPoint Add(IPoint s1, IPoint s2);
+        IPoint Add(IPoint s2);
         // Subtract points so that their scalars subtract homomorphically.
-        IPoint Sub(IPoint a, IPoint b);
+        IPoint Sub(IPoint b);
         // Set to the negation of point.
         IPoint Neg();
-        // Multiply point p by the scalar s.
-        // If p == nil, multiply with the standard base point Base().
-        IPoint Mul(IPoint p, IScalar s);
+        // Multiply point by the scalar s.
+        IPoint Mul(IScalar s);
         byte[] GetBytes();
     }
 

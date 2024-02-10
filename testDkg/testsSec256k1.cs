@@ -23,6 +23,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg;
+
 namespace Secp256k1Tests
 {
     public class Secp256k1ScalarTests
@@ -30,8 +32,6 @@ namespace Secp256k1Tests
         private Secp256k1Scalar _scalar;
         private IScalar _zero;
         private IScalar _one;
-        private IScalar _order;
-
 
         [SetUp]
         public void Setup()
@@ -39,10 +39,27 @@ namespace Secp256k1Tests
             _scalar = new Secp256k1Scalar();
             _zero = new Secp256k1Scalar().Zero();
             _one = new Secp256k1Scalar().One();
-            _order = _zero.Sub(_zero, _one);
     }
 
-    [Test]
+        [Test]
+        public void TestEquals()
+        {
+            _scalar.Pick(new RandomStream());
+            Assert.That(_scalar, Is.Not.EqualTo(null));
+            
+            Secp256k1Scalar? scalar2 = new(); 
+            scalar2.Pick(new RandomStream());
+            Assert.That(_scalar, Is.Not.EqualTo(scalar2));
+            
+            object? obj = new Secp256k1Point();
+            Assert.That(_scalar, Is.Not.EqualTo(obj));
+
+            scalar2 = _scalar.Clone() as Secp256k1Scalar;
+            obj = scalar2;
+            Assert.That(_scalar, Is.EqualTo(obj));
+        }
+
+        [Test]
         public void TestPick()
         {
             _scalar.Pick(new RandomStream());
@@ -89,7 +106,7 @@ namespace Secp256k1Tests
         {
             _scalar.Pick(new RandomStream());
             IScalar scalar2 = _scalar.Neg();
-            scalar2 = _scalar.Add(_scalar, scalar2);
+            scalar2 = _scalar.Add(scalar2);
             Assert.That(_zero, Is.EqualTo(scalar2));
         }
 
@@ -98,32 +115,40 @@ namespace Secp256k1Tests
         {
             _scalar.Pick(new RandomStream());
             IScalar scalar2 = _scalar.Clone();
-            scalar2 = _scalar.Sub(_scalar, scalar2);
+            scalar2 = _scalar.Sub(scalar2);
             Assert.That(_zero, Is.EqualTo(scalar2));
         }
 
         [Test]
         public void TestMulInv()
         {
-            // ensure that the scalar is not zero and not equal to the order of the group,
+            // ensure that the scalar is not zero or one,
             // because these values are not relatively prime to the order of the group
             // and the inverse does not exist
             do
             {
                 _scalar.Pick(new RandomStream());
-            } while (_scalar.Equals(_zero) || _scalar.Equals(_order));
+            } while (_scalar.Equals(_zero) || _scalar.Equals(_one));
 
             IScalar scalar2 = _scalar.Inv();
-            scalar2 = _scalar.Mul(_scalar, scalar2);
+            scalar2 = _scalar.Mul(scalar2);
             Assert.That(_one, Is.EqualTo(scalar2));
         }
 
         [Test]
         public void TestMulDiv()
         {
-           _scalar.Pick(new RandomStream());
+            // ensure that the scalar is not zero or one,
+            // because these values are not relatively prime to the order of the group
+            // and the inverse does not exist
+            do
+            {
+                _scalar.Pick(new RandomStream());
+            } while (_scalar.Equals(_zero) || _scalar.Equals(_one));
+
+            _scalar.Pick(new RandomStream());
             IScalar scalar2 = _scalar.Clone();
-            scalar2 = _scalar.Div(_scalar, scalar2);
+            scalar2 = _scalar.Div(scalar2);
             Assert.That(_one, Is.EqualTo(scalar2));
         }
 
@@ -162,6 +187,21 @@ namespace Secp256k1Tests
         }
 
         [Test]
+        public void TestEquals()
+        {
+            _point.Pick(new RandomStream());
+            Assert.That(_point, Is.Not.EqualTo(null));
+
+            Secp256k1Point? point2 = new();
+            point2.Pick(new RandomStream());
+            Assert.That(_point, Is.Not.EqualTo(point2));
+
+            point2 = _point.Clone() as Secp256k1Point;
+            object? obj = point2;
+            Assert.That(_point, Is.EqualTo(obj));
+        }
+
+        [Test]
         public void TestPick()
         {
             _point.Pick(new RandomStream());
@@ -192,7 +232,7 @@ namespace Secp256k1Tests
         {
             _point.Pick(new RandomStream());
             IPoint point2 = _point.Null();
-            point2 = _point.Add(_point, point2);
+            point2 = _point.Add(point2);
             Assert.That(_point, Is.EqualTo(point2));
         }
 
@@ -201,8 +241,8 @@ namespace Secp256k1Tests
         {
             _point.Pick(new RandomStream());
             IPoint point2 = _point.Neg();
-            point2 = _point.Add(_point, point2);
-            point2 = _point.Add(_point, point2);
+            point2 = _point.Add(point2);
+            point2 = _point.Add(point2);
             // point + (-point) + (-point) = -point
             Assert.That(_point, Is.EqualTo(point2));
         }
@@ -212,8 +252,8 @@ namespace Secp256k1Tests
         {
             _point.Pick(new RandomStream());
             IPoint point2 = _point.Clone();
-            point2 = _point.Sub(_point, point2);
-            point2 = _point.Add(_point, point2);
+            point2 = _point.Sub(point2);
+            point2 = _point.Add(point2);
             // point - point + point = point
             Assert.That(_point, Is.EqualTo(point2));
         }

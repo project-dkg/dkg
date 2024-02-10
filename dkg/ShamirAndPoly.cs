@@ -1,14 +1,40 @@
-﻿// This file implements Shamir secret sharing and polynomial commitments.
+﻿// Copyright (C) 2024 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+// This file is a part of dkg applcation
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+// This file implements Shamir secret sharing and polynomial commitments.
 // Shamir's scheme allows you to split a secret value into multiple parts, so called
 // shares, by evaluating a secret sharing polynomial at certain indices. The
 // shared secret can only be reconstructed (via Lagrange interpolation) if a
 // threshold of the participants provide their shares. A polynomial commitment
 // scheme allows a committer to commit to a secret sharing polynomial so that
 // a verifier can check the claimed evaluations of the committed polynomial.
-// Both schemes of this package are core building blocks for more advanced
-// secret sharing techniques.
 
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+
+[assembly: InternalsVisibleTo("testDkg")]
 
 namespace dkg
 {
@@ -48,10 +74,10 @@ namespace dkg
     }
 
     // PriPoly represents a secret sharing polynomial.
-    public class PriPoly
+    public class PriPoly: IEquatable<PriPoly>
     {
         private IGroup g; // Cryptographic group
-        private readonly List<IScalar> coeffs; // Coefficients of the polynomial
+        public IScalar[] Coeffs { get; } // Coefficients of the polynomial
 
         // Сreates a new secret sharing polynomial using the provided
         // cryptographic group, the secret sharing threshold t, and the secret to be
@@ -59,31 +85,77 @@ namespace dkg
         // stream rand.
         public PriPoly(IGroup group, int t, IScalar? s, RandomStream strm)
         {
-            coeffs = new List<IScalar>(t);
-            coeffs[0] = s ?? group.Scalar().Pick(strm);
+            Coeffs = new IScalar[t];
+            Coeffs[0] = s ?? group.Scalar().Pick(strm);
             for (int i = 1; i < t; i++)
             {
-                coeffs[i] = group.Scalar().Pick(strm);
+                Coeffs[i] = group.Scalar().Pick(strm);
             }
             g = group;
         }
 
-        public PriPoly(IGroup g, List<IScalar> coeffs)
+        public PriPoly(IGroup g, IScalar[] coeffs)
         {
             this.g = g;
-            this.coeffs = coeffs;
+            this.Coeffs = coeffs;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return Equals(obj as PriPoly);
+        }
+
+        // Equals checks equality of two secret sharing polynomials p and q. If p and q are trivially
+        // unequal (e.g., due to mismatching cryptographic groups or polynomial size), this routine
+        // returns in variable time. Otherwise it runs in constant time regardless of whether it
+        // eventually returns true or false.
+        public bool Equals(PriPoly? q)
+        {
+            if (q == null)
+            {
+                return false;
+            }
+            if (g != q.g)
+            {
+                return false;
+            }
+            if (Coeffs.Length != q.Coeffs.Length)
+            {
+                return false;
+            }
+            for (int i = 0; i < Threshold(); i++)
+            {
+                if (!Coeffs[i].Equals(q.Coeffs[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        public override int GetHashCode()
+        {
+            unchecked // Overflow is fine, just wrap
+            {
+                int hash = 17;
+                hash += g.GetHashCode();
+                foreach (var coeff in Coeffs)
+                {
+                    hash = hash * 23 + coeff.GetHashCode();
+                }
+                return hash;
+            }
         }
 
         // Threshold returns the secret sharing threshold.
         public int Threshold()
         {
-            return coeffs.Count;
+            return Coeffs.Length;
         }
 
         // Secret returns the shared secret p(0), i.e., the constant term of the polynomial.
         public IScalar Secret()
         {
-            return coeffs[0];
+            return Coeffs[0];
         }
 
         // Eval computes the private share v = p(i).
@@ -93,16 +165,16 @@ namespace dkg
             var v = g.Scalar().Zero();
             for (int j = Threshold() - 1; j >= 0; j--)
             {
-                v.Mul(v, xi);
-                v.Add(v, coeffs[j]);
+                v = v.Mul(xi);
+                v = v.Add(Coeffs[j]);
             }
             return new PriShare(i, v);
         }
 
-        // Shares creates a list of n private shares p(1),...,p(n).
-        public List<PriShare> Shares(int n)
+        // Shares creates an array of n private shares p(1),...,p(n).
+        public PriShare[] Shares(int n)
         {
-            var shares = new List<PriShare>(n);
+            var shares = new PriShare[n];
             for (int i = 0; i < n; i++)
             {
                 shares[i] = Eval(i);
@@ -114,56 +186,36 @@ namespace dkg
         // as a new polynomial.
         public PriPoly Add(PriPoly q)
         {
-            if (g.ToString() != q.g.ToString())
+            if (g != q.g)
             {
-                throw new ArgumentException("non-matching groups");
+                throw new ArgumentException("PriPoly.Add: Non-matching groups");
             }
             if (Threshold() != q.Threshold())
             {
-                throw new ArgumentException("different number of coefficients");
+                throw new ArgumentException("PriPoly.Add: Different number of coefficients");
             }
-            var newCoeffs = new List<IScalar>(Threshold());
+            var newCoeffs = new IScalar[Threshold()];
             for (int i = 0; i < Threshold(); i++)
             {
-                newCoeffs[i] = g.Scalar().Add(coeffs[i], q.coeffs[i]);
+                newCoeffs[i] = Coeffs[i].Add(q.Coeffs[i]);
             }
-            return new PriPoly(g, coeffs);
-        }
-
-        // Equals checks equality of two secret sharing polynomials p and q. If p and q are trivially
-        // unequal (e.g., due to mismatching cryptographic groups or polynomial size), this routine
-        // returns in variable time. Otherwise it runs in constant time regardless of whether it
-        // eventually returns true or false.
-        public bool Equals(PriPoly q)
-        {
-            if (g.ToString() != q.g.ToString())
-            {
-                return false;
-            }
-            if (coeffs.Count != q.coeffs.Count)
-            {
-                return false;
-            }
-            for (int i = 0; i < Threshold(); i++)
-            {
-                if (!coeffs[i].Equals(q.coeffs[i]))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return new PriPoly(g, newCoeffs);
         }
 
         // Commit creates a public commitment polynomial for the given base point b or
         // the standard base if b == nil.
-        public PubPoly Commit(IPoint b)
+        public PubPoly Commit()
         {
-            var commits = new List<IPoint>(Threshold());
+            return Commit(g.Point().Base());
+        }
+         public PubPoly Commit(IPoint b)
+        {
+            var commits = new IPoint[Threshold()];
             for (int i = 0; i < Threshold(); i++)
             {
-                commits[i] = g.Point().Mul(b, coeffs[i]);
+                commits[i] = b.Mul(Coeffs[i]);
             }
-            return new PubPoly(g, b, commits);
+            return new PubPoly(g, b, [.. commits]);
         }
 
         // Mul multiples p and q together. The result is a polynomial of the sum of
@@ -173,81 +225,61 @@ namespace dkg
         // a general polynomial multiplication routine.
         public PriPoly Mul(PriPoly q)
         {
-            int d1 = coeffs.Count - 1;
-            int d2 = q.coeffs.Count - 1;
-            int newDegree = d1 + d2;
-            var newCoeffs = new List<IScalar>(newDegree + 1);
+            int d1 = Coeffs.Length - 1, d2 = q.Coeffs.Length - 1, newDegree = d1 + d2;
+            var newCoeffs = new IScalar[newDegree + 1];
             for (int i = 0; i <= newDegree; i++)
             {
                 newCoeffs[i] = g.Scalar().Zero();
             }
-            for (int i = 0; i < coeffs.Count; i++)
+            for (int i = 0; i < Coeffs.Length; i++)
             {
-                for (int j = 0; j < q.coeffs.Count; j++)
+                for (int j = 0; j < q.Coeffs.Length; j++)
                 {
-                    var tmp = g.Scalar().Mul(coeffs[i], q.coeffs[j]);
-                    newCoeffs[i + j] = tmp.Add(newCoeffs[i + j], tmp);
+                    var tmp = Coeffs[i].Mul(q.Coeffs[j]);
+                    newCoeffs[i + j] = newCoeffs[i + j].Add(tmp);
                 }
             }
-            return new PriPoly(g, coeffs);
-        }
-
-        // Coefficients return the list of coefficients representing p. This
-        // information is generally PRIVATE and should not be revealed to a third party
-        // lightly.
-        private List<IScalar> Coefficients()
-        {
-            return coeffs;
+            return new PriPoly(g, newCoeffs);
         }
 
         // RecoverSecret reconstructs the shared secret p(0) from a list of private
         // shares using Lagrange interpolation.
-        public static IScalar RecoverSecret(IGroup g, List<PriShare> shares, int t, int n)
+        public static IScalar RecoverSecret(Secp256k1Group g, PriShare[] shares, int t, int n)
         {
-            var x = new List<IScalar>();
-            var y = new List<IScalar>();
-            foreach (var share in shares)
-            {
-                if (share != null && share.V != null && share.I >= 0 && share.I < n)
-                {
-                    x.Add(g.Scalar().SetInt64(1 + share.I));
-                    y.Add(share.V);
-                }
-            }
+            var (x, y) = XyScalar(g, shares, t, n);
+
             if (x.Count < t)
             {
-                throw new ArgumentException("not enough shares to recover secret");
+                throw new ArgumentException("PriPoly.RecoverSecret: Not enough shares to recover secret");
             }
-            var acc = g.Scalar().Zero();
-            var num = g.Scalar();
-            var den = g.Scalar();
-            var tmp = g.Scalar();
-            for (int i = 0; i < x.Count; i++)
+
+            IScalar num = g.Scalar(), den = g.Scalar(), acc = g.Scalar().Zero();
+
+            foreach (int i in x.Keys)
             {
-                var xi = x[i];
-                var yi = y[i];
-                num.Set(yi);
-                den.One();
-                for (int j = 0; j < x.Count; j++)
+                num = num.Set(y[i]);
+                den = den.One();
+                foreach (int j in x.Keys)
                 {
                     if (i == j)
                     {
                         continue;
                     }
-                    num.Mul(num, x[j]);
-                    den.Mul(den, tmp.Sub(x[j], xi));
+                    num = num.Mul(x[j]);
+                    den = den.Mul(x[j].Sub(x[i]));
                 }
-                acc.Add(acc, num.Div(num, den));
+                acc = acc.Add(num.Div(den));
             }
+
             return acc;
         }
 
         // xyScalar returns the list of (x_i, y_i) pairs indexed. The first map returned
         // is the list of x_i and the second map is the list of y_i, both indexed in
         // their respective map at index i.
-        public static (Dictionary<int, IScalar>, Dictionary<int, IScalar>) XyScalar(IGroup g, List<PriShare> shares, int t, int n)
+        public static (Dictionary<int, IScalar>, Dictionary<int, IScalar>) XyScalar(IGroup g, PriShare[] shares, int t, int n)
         {
-            var sorted = shares.Where(s => s != null).ToList();
+            List<PriShare> sorted = shares.Where(s => s != null).ToList();
             sorted.Sort(new ShareComparer());
 
             var x = new Dictionary<int, IScalar>();
@@ -273,12 +305,12 @@ namespace dkg
         // coefficients.  It is up to the caller to make sure that there are enough
         // shares to correctly re-construct the polynomial. There must be at least t
         // shares.
-        public static PriPoly? RecoverPriPoly(IGroup g, List<PriShare> shares, int t, int n)
+        public static PriPoly? RecoverPriPoly(IGroup g, PriShare[] shares, int t, int n)
         {
             var (x, y) = XyScalar(g, shares, t, n);
             if (x.Count != t)
             {
-                throw new Exception("share: not enough shares to recover private polynomial");
+                throw new ArgumentException("PriPoly.RecoverPriPoly: Not enough shares to recover private polynomial");
             }
 
             PriPoly? accPoly = null;
@@ -286,9 +318,9 @@ namespace dkg
             foreach (var j in x.Keys)
             {
                 var basis = LagrangeBasis(g, j, x);
-                for (var i = 0; i < basis.coeffs.Count; i++)
+                for (var i = 0; i < basis.Coeffs.Length; i++)
                 {
-                    basis.coeffs[i] = basis.coeffs[i].Mul(basis.coeffs[i], y[j]);
+                    basis.Coeffs[i] = basis.Coeffs[i].Mul(y[j]);
                 }
 
                 if (accPoly == null)
@@ -303,7 +335,7 @@ namespace dkg
         }
         public override string ToString()
         {
-            var strs = coeffs.Select(c => c.ToString()).ToList();
+            var strs = Coeffs.Select(c => c.ToString()).ToList();
             return "[ " + string.Join(", ", strs) + " ]";
         }
 
@@ -327,20 +359,19 @@ namespace dkg
                 }
 
                 basis = basis.Mul(MinusConst(g, pair.Value));
-                var den = g.Scalar().Sub(xs[i], pair.Value); // den = xi - xm
+                var den = xs[i].Sub(pair.Value); // den = xi - xm
                 den = den.Inv(); // den = 1 / den
-                acc = g.Scalar().Mul(acc, den); // acc = acc * den
+                acc = acc.Mul(den); // acc = acc * den
             }
 
             // multiply all coefficients by the denominator
-            for (int j = 0; j < basis.coeffs.Count; j++)
+            for (int j = 0; j < basis.Coeffs.Length; j++)
             {
-                basis.coeffs[j] = g.Scalar().Mul(basis.coeffs[j], acc);
+                basis.Coeffs[j] = basis.Coeffs[j].Mul(acc);
             }
 
             return basis;
         }
-
     }
 
     // PubShare represents a public share.
@@ -360,32 +391,72 @@ namespace dkg
         {
             return $"{{PubShare: I = {I}; V = {V}}}";
         }
-
     }
 
     // PubPoly represents a public commitment polynomial to a secret sharing polynomial.
-    public class PubPoly(IGroup group, IPoint basePoint, List<IPoint> commits)
+    public class PubPoly(IGroup group, IPoint basePoint, IPoint[] cmt) : IEquatable<PubPoly>
     {
-        private IGroup g = group; // Cryptographic group
-        private IPoint b = basePoint; // Base point, null for standard base
-        private List<IPoint> commits = commits; // Commitments to coefficients of the secret sharing polynomial
+        private readonly IGroup g = group; // Cryptographic group
+        private readonly IPoint b = basePoint; // Base point, null for standard base
+        public IPoint[] Commits { get; } = cmt; // Commitments to coefficients of the secret sharing polynomial
 
-        // Info returns the base point and the commitments to the polynomial coefficients.
-        public (IPoint, List<IPoint>) Info()
+        public PubPoly(IGroup group, IPoint[] cmt) : this(group, group.Point().Base(), cmt)
         {
-            return (b, commits);
+        }
+        public override bool Equals(object? obj)
+        {
+            return Equals(obj as PubPoly);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked // Overflow is fine, just wrap
+            {
+                int hash = 17;
+                hash = hash + g.GetHashCode();
+                hash = hash * 23 + b.GetHashCode();
+                foreach (var commit in Commits)
+                {
+                    hash = hash * 23 + commit.GetHashCode();
+                }
+                return hash;
+            }
+        }
+
+        // Equals checks equality of two public commitment polynomials p and q. If p and
+        // q are trivially unequal (e.g., due to mismatching cryptographic groups),
+        // this routine returns in variable time. Otherwise it runs in constant time
+        // regardless of whether it eventually returns true or false.
+        public bool Equals(PubPoly? q)
+        {
+            if (q == null)
+            {
+                return false;
+            }
+            if (g != q.g)
+            {
+                return false;
+            }
+            for (int i = 0; i < Threshold(); i++)
+            {
+                if (!Commits[i].Equals(q.Commits[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         // Threshold returns the secret sharing threshold.
         public int Threshold()
         {
-            return commits.Count;
+            return Commits.Length;
         }
 
         // Commit returns the secret commitment p(0), i.e., the constant term of the polynomial.
         public IPoint Commit()
         {
-            return commits[0];
+            return Commits[0];
         }
 
         // Eval computes the public share v = p(i).
@@ -395,16 +466,16 @@ namespace dkg
             var v = g.Point().Null();
             for (int j = Threshold() - 1; j >= 0; j--)
             {
-                v.Mul(v, xi);
-                v.Add(v, commits[j]);
+                v = v.Mul(xi);
+                v = v.Add(Commits[j]);
             }
             return new PubShare(i, v);
         }
 
         // Shares creates a list of n public commitment shares p(1),...,p(n).
-        public List<PubShare> Shares(int n)
+        public PubShare[] Shares(int n)
         {
-            var shares = new List<PubShare>(n);
+            var shares = new PubShare[n];
             for (int i = 0; i < n; i++)
             {
                 shares[i] = Eval(i);
@@ -420,7 +491,7 @@ namespace dkg
         // base point and thus should not be used in further computations.
         public PubPoly Add(PubPoly q)
         {
-            if (g.ToString() != q.g.ToString())
+            if (g != q.g)
             {
                 throw new ArgumentException("non-matching groups");
             }
@@ -430,44 +501,24 @@ namespace dkg
                 throw new ArgumentException("different number of coefficients");
             }
 
-            var newCommits = new List<IPoint>(Threshold());
+            var newCommits = new IPoint[Threshold()];
             for (int i = 0; i < Threshold(); i++)
             {
-                newCommits[i] = g.Point().Add(commits[i], q.commits[i]);
+                newCommits[i] = Commits[i].Add(q.Commits[i]);
             }
 
             return new PubPoly(g, b, newCommits);
-        }
-
-        // Equals checks equality of two public commitment polynomials p and q. If p and
-        // q are trivially unequal (e.g., due to mismatching cryptographic groups),
-        // this routine returns in variable time. Otherwise it runs in constant time
-        // regardless of whether it eventually returns true or false.
-        public bool Equals(PubPoly q)
-        {
-            if (g.ToString() != q.g.ToString())
-            {
-                return false;
-            }
-            for (int i = 0; i < Threshold(); i++)
-            {
-                if (!commits[i].Equals(q.commits[i]))
-                {
-                    return false;
-                }
-            }
-            return true;
         }
 
         // Check a private share against a public commitment polynomial.
         public bool Check(PriShare s)
         {
             var pv = Eval(s.I);
-            var ps = g.Point().Mul(b, s.V);
+            var ps = b.Mul(s.V);
             return pv.V.Equals(ps);
         }
 
-        public static (Dictionary<int, IScalar>, Dictionary<int, IPoint>) XyCommit(IGroup g, List<PubShare> shares, int t, int n)
+        public static (Dictionary<int, IScalar>, Dictionary<int, IPoint>) XyCommit(IGroup g, PubShare[] shares, int t, int n)
         {
             var sorted = shares.Where(s => s != null).ToList();
             sorted.Sort(new ShareComparer());
@@ -495,20 +546,17 @@ namespace dkg
             return (x, y);
         }
 
-        public static IPoint RecoverCommit(IGroup g, List<PubShare> shares, int t, int n)
+        public static IPoint RecoverCommit(IGroup g, PubShare[] shares, int t, int n)
         {
             var (x, y) = XyCommit(g, shares, t, n);
 
             if (x.Count < t)
             {
-                throw new Exception("share: not enough good public shares to reconstruct secret commitment");
+                throw new ArgumentException("PubPoly.RecoverCommit: not enough good public shares to reconstruct secret commitment");
             }
 
-            var num = g.Scalar();
-            var den = g.Scalar();
-            var tmp = g.Scalar();
-            var acc = g.Point().Null();
-            var tmpPoint = g.Point();
+            IScalar num = g.Scalar(), den = g.Scalar();
+            IPoint acc = g.Point().Null();
 
             foreach (var pair in x)
             {
@@ -522,24 +570,22 @@ namespace dkg
                         continue;
                     }
 
-                    num.Mul(num, pair2.Value);
-                    den.Mul(den, tmp.Sub(pair2.Value, pair.Value));
+                    num = num.Mul(pair2.Value);
+                    den = den.Mul(pair2.Value.Sub(pair.Value));
                 }
-
-                tmpPoint.Mul(y[pair.Key], num.Div(num, den));
-                acc.Add(acc, tmpPoint);
+                acc = acc.Add(y[pair.Key].Mul(num.Div(den)));
             }
 
             return acc;
         }
 
-        public static PubPoly? RecoverPubPoly(IGroup g, List<PubShare> shares, int t, int n)
+        public static PubPoly? RecoverPubPoly(IGroup g, PubShare[] shares, int t, int n)
         {
             var (x, y) = XyCommit(g, shares, t, n);
 
             if (x.Count < t)
             {
-                throw new Exception("share: not enough good public shares to reconstruct secret commitment");
+                throw new Exception("PubPoly.PubPoly: not enough good public shares to reconstruct secret commitment");
             }
 
             PubPoly? accPoly = null;

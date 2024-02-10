@@ -34,12 +34,6 @@ jobs:
     - name: Test
       run: dotnet test --no-restore --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
 
-    - name: Install ReportGenerator tool
-      run: dotnet tool install --global dotnet-reportgenerator-globaltool
-
-    - name: Generate coverage report
-      run: reportgenerator "-reports:**/coverage.cobertura.xml" "-targetdir:coveragereport" -reporttypes:Html
-
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4.0.1
       env:
