@@ -84,24 +84,20 @@ namespace dkg
             return this;
         }   
 
-        public IScalar Add(IScalar s1, IScalar s2)
+        public IScalar Add(IScalar s2)
         {
-            if (s1 is not Secp256k1Scalar other1)
-                throw new InvalidCastException("s1 is not a Secp256k1Scalar");
             if (s2 is not Secp256k1Scalar other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Scalar");
 
-            return new Secp256k1Scalar(other1._value.Add(other2._value).Mod(_order));
+            return new Secp256k1Scalar(_value.Add(other2._value).Mod(_order));
         }
 
-        public IScalar Sub(IScalar s1, IScalar s2)
+        public IScalar Sub(IScalar s2)
         {
-            if (s1 is not Secp256k1Scalar other1)
-                throw new InvalidCastException("s1 is not a Secp256k1Scalar");
             if (s2 is not Secp256k1Scalar other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Scalar");
 
-            return new Secp256k1Scalar(other1._value.Subtract(other2._value).Mod(_order));
+            return new Secp256k1Scalar(_value.Subtract(other2._value).Mod(_order));
         }
 
         public IScalar Neg()
@@ -115,24 +111,20 @@ namespace dkg
             return this;
         }
 
-        public IScalar Mul(IScalar s1, IScalar s2)
+        public IScalar Mul(IScalar s2)
         {
-            if (s1 is not Secp256k1Scalar other1)
-                throw new InvalidCastException("s1 is not a Secp256k1Scalar");
             if (s2 is not Secp256k1Scalar other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Scalar");
 
-            return new Secp256k1Scalar(other1._value.ModMultiply(other2._value, _order));
+            return new Secp256k1Scalar(_value.ModMultiply(other2._value, _order));
         }
 
-        public IScalar Div(IScalar s1, IScalar s2)
+        public IScalar Div(IScalar s2)
         {
-            if (s1 is not Secp256k1Scalar other1)
-                throw new InvalidCastException("s1 is not a Secp256k1Scalar");
             if (s2 is not Secp256k1Scalar other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Scalar");
 
-            return new Secp256k1Scalar(other1._value.ModDivide(other2._value, _order));
+            return new Secp256k1Scalar(_value.ModDivide(other2._value, _order));
         }
 
         public IScalar Inv()
@@ -202,10 +194,13 @@ namespace dkg
         }
         public override int GetHashCode()
         {
-            int hash = 17;
-            hash = hash * 31 + (_point.AffineXCoord != null ? _point.AffineXCoord.GetHashCode() : 0);
-            hash = hash * 31 + (_point.AffineYCoord != null ? _point.AffineYCoord.GetHashCode() : 0);
-            return hash;
+            unchecked // Overflow is fine, just wrap
+            {
+                int hash = 17;
+                hash = hash * 31 + _point.AffineXCoord.GetHashCode();
+                hash = hash * 31 + _point.AffineYCoord.GetHashCode();
+                return hash;
+            }
         }
         public override bool Equals(object? obj)
         {
@@ -264,25 +259,21 @@ namespace dkg
             return new Secp256k1Point(_point);
         }
 
-        public IPoint Add(IPoint s1, IPoint s2)
+        public IPoint Add(IPoint s2)
         {
-            if (s1 is not Secp256k1Point other1)
-                throw new InvalidCastException("s1 is not a Secp256k1Point");
             if (s2 is not Secp256k1Point other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Point");
 
-            ECPoint resultPoint = other1._point.Add(other2._point);
+            ECPoint resultPoint = _point.Add(other2._point);
             return new Secp256k1Point(resultPoint);
         }
-        public IPoint Sub(IPoint s1, IPoint s2)
+        public IPoint Sub(IPoint s2)
         {
-            if (s1 is not Secp256k1Point other1)
-                throw new InvalidCastException("s1 is not a Secp256k1Point");
             if (s2 is not Secp256k1Point other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Point");
 
             // Subtracting points in elliptic curves is equivalent to adding the first point to the negation of the second point
-            ECPoint resultPoint = other1._point.Add(other2._point.Negate());
+            ECPoint resultPoint = _point.Add(other2._point.Negate());
             return new Secp256k1Point(resultPoint);
         }
 
@@ -292,14 +283,12 @@ namespace dkg
             return new Secp256k1Point(resultPoint);
         }
 
-        public IPoint Mul(IPoint p, IScalar s)
+        public IPoint Mul(IScalar s)
         {
-            if (p is not Secp256k1Point other)
-                throw new InvalidCastException("p is not a Secp256k1Point");
             if (s is not Secp256k1Scalar scalar)
                 throw new InvalidCastException("s is not a Secp256k1Scalar");
 
-            ECPoint resultPoint = other._point.Multiply(scalar.GetValue());
+            ECPoint resultPoint = _point.Multiply(scalar.GetValue());
             return new Secp256k1Point(resultPoint);
         }
 
@@ -327,11 +316,28 @@ namespace dkg
         }
     }
 
-    public class Secp256k1Group : IGroup
+    public class Secp256k1Group : IGroup, IEquatable<Secp256k1Group>
     {
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
         private static readonly ECCurve _curve = _ecP.Curve;
+        public override bool Equals(object? obj)
+        {
+            return Equals(obj as Secp256k1Group);
+        }
 
+        public bool Equals(Secp256k1Group? other)
+        {
+            // All instances of Secp256k1Group are equal, because they represent the same mathematical group.
+            // So, if the other object is a Secp256k1Group, we return true.
+            // If it's null or a different type, we return false.
+            return other is not null;
+        }
+        public override int GetHashCode()
+        {
+            // All instances of Secp256k1Group are equal, so they should return the same hash code.
+            // We can just return a constant value.
+            return ToString().GetHashCode();
+        }
         public override string ToString()
         {
             return $"Secp256k1 Group: Order = {_ecP.N}, Scalar Length = {ScalarLen()}, Point Length = {PointLen()}";
