@@ -31,8 +31,8 @@
 // scheme allows a committer to commit to a secret sharing polynomial so that
 // a verifier can check the claimed evaluations of the committed polynomial.
 
-using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
@@ -83,21 +83,21 @@ namespace dkg
         // cryptographic group, the secret sharing threshold t, and the secret to be
         // shared s. If s is nil, a new s is chosen using the provided randomness
         // stream rand.
-        public PriPoly(IGroup group, int t, IScalar? s, RandomStream strm)
+        public PriPoly(IGroup group, int t, IScalar? s)
         {
+            g = group;
             Coeffs = new IScalar[t];
-            Coeffs[0] = s ?? group.Scalar().Pick(strm);
+            Coeffs[0] = s ?? group.Scalar().Pick(g.RndStream());
             for (int i = 1; i < t; i++)
             {
-                Coeffs[i] = group.Scalar().Pick(strm);
+                Coeffs[i] = group.Scalar().Pick(g.RndStream());
             }
-            g = group;
         }
 
-        public PriPoly(IGroup g, IScalar[] coeffs)
+        public PriPoly(IGroup group, IScalar[] coeffs)
         {
-            this.g = g;
-            this.Coeffs = coeffs;
+            g = group;
+            Coeffs = coeffs;
         }
 
         public override bool Equals(object? obj)

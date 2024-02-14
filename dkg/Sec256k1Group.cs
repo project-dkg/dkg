@@ -1,8 +1,6 @@
 ﻿using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Math.EC;
-using System;
-using System.IO;
 
 namespace dkg
 {
@@ -169,7 +167,7 @@ namespace dkg
             BinaryReader reader = new(s);
             Int32 length = reader.ReadInt32();
             byte[] bytes = reader.ReadBytes(length);
-            _value = new BigInteger(bytes);
+            SetBytes(bytes);
         }
     }
 
@@ -320,6 +318,8 @@ namespace dkg
     {
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
         private static readonly ECCurve _curve = _ecP.Curve;
+
+        private readonly RandomStream strm = new();
         public override bool Equals(object? obj)
         {
             return Equals(obj as Secp256k1Group);
@@ -349,7 +349,7 @@ namespace dkg
 
         public IScalar Scalar()
         {
-            return new Secp256k1Scalar().Pick(new RandomStream());
+            return new Secp256k1Scalar().Pick(strm);
         }
 
         public int PointLen()
@@ -359,7 +359,12 @@ namespace dkg
 
         public IPoint Point()
         {
-            return new Secp256k1Point().Pick(new RandomStream());
+            return new Secp256k1Point().Pick(strm);
+        }
+
+        public RandomStream RndStream()
+        {
+            return strm;
         }
     }
 }
