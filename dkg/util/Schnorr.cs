@@ -44,7 +44,7 @@ namespace dkg
         public static byte[] Sign(IGroup g, IScalar privateKey, byte[] msg)
         {
             // create random secret k and public point commitment R
-            var k = g.Scalar().Pick(g.RndStream());
+            var k = g.Scalar();
             var R = g.Point().Base().Mul(k);
 
             // create hash(publicKey || R || msg)

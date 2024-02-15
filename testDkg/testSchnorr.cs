@@ -39,7 +39,7 @@ namespace SchnorrTests
 
         private (IScalar prv, IPoint pub) KeyPair()
         {
-            var prv = _g.Scalar().Pick(_g.RndStream());
+            var prv = _g.Scalar();
             var pub = _g.Point().Base().Mul(prv);
             return (prv, pub);
         }

@@ -240,8 +240,8 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var G = g.Point().Pick(g.RndStream());
-            var H = g.Point().Pick(g.RndStream());
+            var G = g.Point();
+            var H = g.Point();
 
             var p = new PriPoly(g, t, null);
             var q = new PriPoly(g, t, null);
@@ -268,7 +268,7 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var G = g.Point().Pick(g.RndStream());
+            var G = g.Point();
 
             var p1 = new PriPoly(g, t, null);
             var p2 = new PriPoly(g, t, null);

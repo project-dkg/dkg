@@ -23,154 +23,161 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using System.Net.Sockets;
+
 namespace DkgTests
 {
     [TestFixture]
     public class DkgTests
     {
-        [Test]
-        public void TestRefreshDKG()
+        private const int nbVerifiers = 7;
+
+        private int _goodT;
+
+        private IGroup _g;
+        private IPoint _dealerPub;
+        private IScalar _dealerSec;
+        private IScalar _secret;
+        private int _vssThreshold;
+
+        List<IPoint> _verifiersPub;
+        List<IScalar> _verifiersSec;
+
+        [SetUp]
+        public void Setup()
         {
-            var g = new Secp256k1Group();
-            int n = 10;
-            int t = n / 2 + 1;
+            _g = Suite.G;
+            (_dealerSec, _dealerPub) = KeyPair();
+            (_secret, _) = KeyPair();
+            _vssThreshold = Dealer.MinimumT(nbVerifiers);
 
-            // Run an n-fold Pedersen VSS (= DKG)
-            var priPolys = new PriPoly[n];
-            var priShares = new PriShare[n][];
-            var pubPolys = new PubPoly[n];
-            var pubShares = new PubShare[n][];
+            _verifiersPub = [];
+            _verifiersSec = [];
+
+            (_verifiersSec, _verifiersPub) = GenCommits(nbVerifiers);
+
+            _goodT = Dealer.MinimumT(nbVerifiers);
+        }
+        private (IScalar prv, IPoint pub) KeyPair()
+        {
+            var prv = _g.Scalar();
+            var pub = _g.Point().Base().Mul(prv);
+            return (prv, pub);
+        }
+
+        private (List<IScalar>, List<IPoint>) GenCommits(int n)
+        {
+            List<IScalar> secrets = new(n);
+            List<IPoint> publics = new(n);
+
             for (int i = 0; i < n; i++)
             {
-                priPolys[i] = new PriPoly(g, t, null);
-                priShares[i] = priPolys[i].Shares(n);
-                pubPolys[i] = priPolys[i].Commit();
-                pubShares[i] = pubPolys[i].Shares(n);
+                var (prv, pub) = KeyPair();
+                secrets.Add(prv);
+                publics.Add(pub);
             }
+            return (secrets, publics);
+        }
 
-            // Verify VSS shares
-            for (int i = 0; i < n; i++)
+        [Test]
+        public void TestVSSDealerNew()
+        {
+            int goodT = Dealer.MinimumT(nbVerifiers);
+            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, goodT);
+
+            int[] badTs = [0, 1, -4];
+            foreach (int badT in badTs)
             {
-                for (int j = 0; j < n; j++)
-                {
-                    var sij = priShares[i][j];
-                    // s_ij * G
-                    var sijG = g.Point().Base().Mul(sij.V);
-                    Assert.That(pubShares[i][j].V, Is.EqualTo(sijG));
-                }
+                Assert.Throws<ArgumentException>(() =>
+                    {
+                        Dealer dealer = new(_dealerSec, _secret, _verifiersPub, badT);
+                    });
             }
+        }
 
-            // Create private DKG shares
-            var dkgShares = new PriShare[n];
-            for (int i = 0; i < n; i++)
+        [Test]
+        public void TestVssVerifierNew()
+        {
+            Random Random = new();
+            int randIdx = Random.Next(_verifiersPub.Count);
+            Verifier v = new(_verifiersSec[randIdx], _dealerPub, _verifiersPub);
+
+            IScalar wrongKey = _g.Scalar();
+            Assert.Throws<ArgumentException>(() =>
             {
-                var acc = g.Scalar().Zero();
-                for (int j = 0; j < n; j++) // assuming all participants are in the qualified set
-                {
-                    acc = acc.Add(priShares[j][i].V);
-                }
-                dkgShares[i] = new PriShare(i, acc);
-            }
+                Verifier wrongVerifier = new Verifier(wrongKey, _dealerPub, _verifiersPub);
+            });
+        }
 
-            // Create public DKG commitments (= verification vector)
-            var dkgCommits = new IPoint[t];
-            for (int k = 0; k < t; k++)
+        [Test]
+        public void TestVssSessionId()
+        {
+            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _vssThreshold);
+            IPoint[] commitments = [.. dealer.Deals[0].Commitments];
+            byte[] sid = dealer.CreateSessionId(_dealerPub, _verifiersPub, commitments, dealer.T);
+            Assert.That(sid, Is.Not.Null);
+
+            byte[] sid2 = dealer.CreateSessionId(_dealerPub, _verifiersPub, commitments, dealer.T);
+            Assert.That(sid, Is.EqualTo(sid2));
+
+            IPoint wrongDealerPub = _dealerPub.Add(_dealerPub);
+            byte[] sid3 = dealer.CreateSessionId(wrongDealerPub, _verifiersPub, commitments, dealer.T);
+            Assert.That(sid3, Is.Not.Null);
+            Assert.That(sid3, Is.Not.EqualTo(sid2));
+        }
+
+        [Test]
+        public void TestVssDhExchange()
+        {
+            IPoint pub = _g.Point().Base();
+            IScalar priv = _g.Scalar();
+            IPoint point = DhHelper.DhExchange(priv, pub);
+            Assert.That(point, Is.EqualTo(_g.Point().Base().Mul(priv)));
+        }
+
+        [Test]
+        public void TestVssContext()
+        {
+            byte[] context = DhHelper.Context(Suite.Hash, _dealerPub, _verifiersPub);
+            Assert.That(context, Has.Length.EqualTo(Suite.Hash.HashSize / 8));
+        }
+
+        [Test]
+        public void TestVSSDealEquals()
+        {
+            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _goodT);
+            Deal d = new();
+
+            Assert.Multiple(() =>
             {
-                var acc = g.Point().Null();
-                for (int i = 0; i < n; i++) // assuming all participants are in the qualified set
-                {
-                    var cmt = pubPolys[i].Commits;
-                    acc = acc.Add(cmt[k]);
-                }
-                dkgCommits[k] = acc;
-            }
+                Assert.That(dealer.Deals[0], Is.Not.EqualTo(null));
+                Assert.That(dealer.Deals[1], Is.Not.EqualTo(dealer.Deals[0]));
+                Assert.That(dealer.Deals[1], Is.Not.EqualTo(d));
+                Assert.That(dealer.Deals[1].GetHashCode(), Is.Not.EqualTo(dealer.Deals[0].GetHashCode()));
+                Assert.That(dealer.Deals[1].GetHashCode(), Is.Not.EqualTo(d.GetHashCode()));
+            });
+        }
 
-            // Check that the private DKG shares verify against the public DKG commits
-            var dkgPubPoly = new PubPoly(g, dkgCommits);
-            for (int i = 0; i < n; i++)
-            {
-                Assert.That(dkgPubPoly.Check(dkgShares[i]), Is.True);
-            }
+        [Test]
+        public void TestVSSDealMarshaUnmarshal()
+        {
+            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _goodT);
+            Deal d = new();
 
-            // Start verifiable resharing process
-            var subPriPolys = new PriPoly[n];
-            var subPriShares = new PriShare[n][];
-            var subPubPolys = new PubPoly[n];
-            var subPubShares = new PubShare[n][];
+            MemoryStream stream = new();
+            dealer.Deals[0].MarshalBinary(stream);
+            Assert.That(stream.Length, Is.EqualTo(dealer.Deals[0].MarshalSize()));
+            stream.Position = 0;
+            d.UnmarshalBinary(stream);
+            Assert.That(dealer.Deals[0], Is.EqualTo(d));
+        }
 
-            // Create subshares and subpolys
-            for (int i = 0; i < n; i++)
-            {
-                subPriPolys[i] = new PriPoly(g, t, dkgShares[i].V);
-                subPriShares[i] = subPriPolys[i].Shares(n);
-                subPubPolys[i] = subPriPolys[i].Commit();
-                subPubShares[i] = subPubPolys[i].Shares(n);
-                Assert.That(subPubShares[i][0].V, Is.EqualTo(g.Point().Base().Mul(subPriShares[i][0].V)));
-            }
-
-            // Handout shares to new nodes column-wise and verify them
-            var newDKGShares = new PriShare[n];
-            for (int i = 0; i < n; i++)
-            {
-                var tmpPriShares = new PriShare[n]; // column-wise reshuffled sub-shares
-                var tmpPubShares = new PubShare[n]; // public commitments to old DKG private shares
-                for (int j = 0; j < n; j++)
-                {
-                    // Check 1: Verify that the received individual private subshares s_ji
-                    // is correct by evaluating the public commitment vector
-                    tmpPriShares[j] = new PriShare(j, subPriShares[j][i].V); // Shares that participant i gets from j
-                    Assert.That(subPubPolys[j].Eval(i).V, Is.EqualTo(g.Point().Base().Mul(tmpPriShares[j].V)));
-
-                    // Check 2: Verify that the received sub public shares are
-                    // commitments to the original secret
-                    tmpPubShares[j] = dkgPubPoly.Eval(j);
-                    Assert.That(subPubPolys[j].Commit(), Is.EqualTo(tmpPubShares[j].V));
-                }
-                // Check 3: Verify that the received public shares interpolate to the
-                // original DKG public key
-                var com = PubPoly.RecoverCommit(g, tmpPubShares, t, n);
-                Assert.That(com, Is.EqualTo(dkgCommits[0]));
-
-                // Compute the refreshed private DKG share of node i
-                var s = PriPoly.RecoverSecret(g, tmpPriShares, t, n);
-                newDKGShares[i] = new PriShare(i, s);
-            }
-
-            // Refresh the DKG commitments (= verification vector)
-            var newDKGCommits = new IPoint[t];
-            for (int i = 0; i < t; i++)
-            {
-                var pShares = new PubShare[n];
-                for (int j = 0; j < n; j++)
-                {
-                    var cmt = subPubPolys[j].Commits;
-                    pShares[j] = new PubShare(j, cmt[i]);
-                }
-                var com = PubPoly.RecoverCommit(g, pShares, t, n);
-                newDKGCommits[i] = com;
-            }
-
-            // Check that the old and new DKG public keys are the same
-            Assert.That(newDKGCommits[0], Is.EqualTo(dkgCommits[0]));
-
-            // Check that the old and new DKG private shares are different
-            for (int i = 0; i < n; i++)
-            {
-                Assert.That(newDKGShares[i].V, Is.Not.EqualTo(dkgShares[i].V));
-            }
-
-            // Check that the refreshed private DKG shares verify against the refreshed public DKG commits
-            var q = new PubPoly(g, newDKGCommits);
-            for (int i = 0; i < n; i++)
-            {
-                Assert.That(q.Check(newDKGShares[i]), Is.True);
-            }
-
-            // Recover the private polynomial
-            var refreshedPriPoly = PriPoly.RecoverPriPoly(g, newDKGShares, t, n);
-
-            // Check that the secret and the corresponding (old) public commit match
-            Assert.That(dkgCommits[0], Is.EqualTo(g.Point().Base().Mul(refreshedPriPoly!.Secret())));
+        [Test]
+        public void TestVSSDealEncryptDecrypt()
+        {
+            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _goodT);
+            var encrypted = dealer.EncryptedDeal(0);
+            Assert.That(encrypted, Is.Not.Null);
         }
     }
 }

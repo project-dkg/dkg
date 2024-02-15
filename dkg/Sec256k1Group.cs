@@ -140,33 +140,43 @@ namespace dkg
 
         public IScalar SetBytes(byte[] bytes)
         {
-            _value = new BigInteger(bytes).Mod(_order);
+            _value = new BigInteger(1, bytes).Mod(_order);
             return this;
         }
 
         public byte[] GetBytes()
         {
-            return _value.ToByteArray();
-        }
+            byte[] bytes = _value.ToByteArrayUnsigned();
 
+            if (bytes.Length < _length)
+            {
+                byte[] paddedBytes = new byte[_length];
+                Array.Copy(bytes, 0, paddedBytes, _length - bytes.Length, bytes.Length); // Copy bytes to the end of paddedBytes
+                bytes = paddedBytes;
+            }
+            else if (bytes.Length > _length)
+            {
+                throw new InvalidOperationException("GetBytes: The byte array is longer than expected.");
+            }
+
+            return bytes;
+        }
         public void MarshalBinary(Stream s)
         {
             byte[] bytes = GetBytes();
             BinaryWriter writer = new(s);
-            writer.Write(bytes.Length);
             writer.Write(bytes);
         }
 
         public int MarshalSize()
         {
-            return GetBytes().Length + sizeof(Int32);
+            return GetLength();
         }
 
         public void UnmarshalBinary(Stream s)
         {
             BinaryReader reader = new(s);
-            Int32 length = reader.ReadInt32();
-            byte[] bytes = reader.ReadBytes(length);
+            byte[] bytes = reader.ReadBytes(GetLength());
             SetBytes(bytes);
         }
     }
@@ -192,13 +202,7 @@ namespace dkg
         }
         public override int GetHashCode()
         {
-            unchecked // Overflow is fine, just wrap
-            {
-                int hash = 17;
-                hash = hash * 31 + _point.AffineXCoord.GetHashCode();
-                hash = hash * 31 + _point.AffineYCoord.GetHashCode();
-                return hash;
-            }
+            return _point.GetHashCode();
         }
         public override bool Equals(object? obj)
         {
@@ -319,7 +323,7 @@ namespace dkg
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
         private static readonly ECCurve _curve = _ecP.Curve;
 
-        private readonly RandomStream strm = new();
+        private readonly RandomStream _strm = new();
         public override bool Equals(object? obj)
         {
             return Equals(obj as Secp256k1Group);
@@ -349,7 +353,7 @@ namespace dkg
 
         public IScalar Scalar()
         {
-            return new Secp256k1Scalar().Pick(strm);
+            return new Secp256k1Scalar().Pick(_strm);
         }
 
         public int PointLen()
@@ -359,12 +363,12 @@ namespace dkg
 
         public IPoint Point()
         {
-            return new Secp256k1Point().Pick(strm);
+            return new Secp256k1Point().Pick(_strm);
         }
 
         public RandomStream RndStream()
         {
-            return strm;
+            return _strm;
         }
     }
 }
