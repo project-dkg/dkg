@@ -41,15 +41,15 @@ namespace dkg
 {
     public static class Schnorr
     {
-        public static byte[] Sign(IGroup g, IScalar privateKey, byte[] msg)
+        public static byte[] Sign(IScalar privateKey, byte[] msg)
         {
             // create random secret k and public point commitment R
-            var k = g.Scalar();
-            var R = g.Point().Base().Mul(k);
+            var k = Suite.G.Scalar();
+            var R = Suite.G.Point().Base().Mul(k);
 
             // create hash(publicKey || R || msg)
-            var publicKey = g.Point().Base().Mul(privateKey);
-            var h = Hash(g, publicKey, R, msg);
+            var publicKey = Suite.G.Point().Base().Mul(privateKey);
+            var h = Hash(publicKey, R, msg);
 
             // compute response s = k + x*h
             var s = k.Add(privateKey.Mul(h));
@@ -62,13 +62,13 @@ namespace dkg
             return b.ToArray();
         }
 
-        public static string? VerifyWithChecks(IGroup g, IPoint publicKey, byte[] msg, byte[] sig)
+        public static string? VerifyWithChecks(IPoint publicKey, byte[] msg, byte[] sig)
         {
             const string invalidLength = "Schnorr: invalid length";
             const string invalidSignature = "Schnorr: invalid signature";
 
-            var R = g.Point();
-            var s = g.Scalar();
+            var R = Suite.G.Point();
+            var s = Suite.G.Scalar();
             using (var memstream = new MemoryStream(sig))
             {
                 try
@@ -90,10 +90,10 @@ namespace dkg
             }
 
             // recompute hash(publicKey || R || msg)
-            var h = Hash(g, publicKey, R, msg);
+            var h = Hash(publicKey, R, msg);
 
             // compute S = g^s
-            var S = g.Point().Base().Mul(s);
+            var S = Suite.G.Point().Base().Mul(s);
             // compute RAh = R + A^h
             var Ah = publicKey.Mul(h);
             var RAs = R.Add(Ah);
@@ -106,12 +106,12 @@ namespace dkg
             return null;
         }
 
-        public static string? Verify(IGroup g, IPoint publicPoint, byte[] msg, byte[] sig)
+        public static string? Verify(IPoint publicPoint, byte[] msg, byte[] sig)
         {
-            return VerifyWithChecks(g, publicPoint, msg, sig);
+            return VerifyWithChecks(publicPoint, msg, sig);
         }
 
-        public static IScalar Hash(IGroup g, IPoint publicPoint, IPoint r, byte[] msg)
+        private static IScalar Hash(IPoint publicPoint, IPoint r, byte[] msg)
         {
             using (var sha512 = SHA512.Create())
             {
@@ -121,7 +121,7 @@ namespace dkg
                 BinaryWriter w = new BinaryWriter(b);
                 w.Write(msg);
                 var hash = sha512.ComputeHash(b.ToArray());
-                return g.Scalar().SetBytes(hash);
+                return Suite.G.Scalar().SetBytes(hash);
             }
         }
     }

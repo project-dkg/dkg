@@ -23,19 +23,24 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using System.Runtime.CompilerServices;
+
+[assembly: InternalsVisibleTo("testDkg")]
+
 namespace dkg
 {
     // Verifier receives a Deal from a Dealer, can reply with a Complaint, and can
     // collaborate with other Verifiers to reconstruct a secret.
-    public class Verifier: Suite
+    public class Verifier
     {
-        public IScalar LongTermKey { get; }
-        public IPoint DealerKey { get; }
-        public List<IPoint> Verifiers { get; }
-        public IPoint PublicKey { get; }
-        public int Index { get; }
-        public byte[] HkdfContext { get; }
-        public Aggregator Aggregator { get; }
+        internal IScalar LongTermKey { get; }
+        internal IPoint DealerKey { get; }
+        internal IPoint PublicKey { get; }
+        public IPoint[] Verifiers { get; set; }
+        internal int Index { get; }
+        internal byte[] HkdfContext { get; }
+        internal Aggregator Aggregator { get; }
+        public string? LastError { get; set; }
 
         // Constructor returns a Verifier out of:
         //   - its longterm secret key
@@ -45,15 +50,17 @@ namespace dkg
         // The security parameter t of the secret sharing scheme is automatically set to
         // a default safe value. If a different t value is required, it is possible to set
         // it with `verifier.SetT()`.
-        public Verifier(IScalar longterm, IPoint dealerKey, List<IPoint> verifiers)
+        public Verifier(IScalar longterm, IPoint dealerKey, IPoint[] verifiers)
         {
+            LastError = null;
             LongTermKey = longterm;
             DealerKey = dealerKey;
-            PublicKey = G.Point().Base().Mul(LongTermKey);
+            PublicKey = Suite.G.Point().Base().Mul(LongTermKey);
+            Verifiers = verifiers;
             bool ok = false;
             int index = -1;
 
-            for (int i = 0; i < verifiers.Count; i++)
+            for (int i = 0; i < verifiers.Length; i++)
             {
                 if (verifiers[i].Equals(PublicKey))
                 {
@@ -67,34 +74,26 @@ namespace dkg
                 throw new ArgumentException("Verifier: public key not found in the list of verifiers");
             }
 
-            Verifiers = verifiers;
             Index = index;
-            HkdfContext = DhHelper.Context(Hash, dealerKey, verifiers);
+            HkdfContext = DhHelper.Context(Suite.Hash, dealerKey, verifiers);
             Aggregator = new Aggregator(verifiers);
         }
 
-        public (Deal?, string?) DecryptDeal(EncryptedDeal encrypted)
+        public Deal? DecryptDeal(EncryptedDeal encrypted)
         {
             // verify signature
-            var err = Schnorr.Verify(G, DealerKey, encrypted.DHKey, encrypted.Signature);
-            if (err != null)
+            string? error = Schnorr.Verify(DealerKey, encrypted.DHKey, encrypted.Signature);
+            if (error != null)
             {
-                return (null, err);
+                LastError = error;
+                return null;
             }
 
             // compute shared key and AES526-GCM cipher
-            var dhKey = G.Point();
+            var dhKey = Suite.G.Point();
             dhKey.UnmarshalBinary(new MemoryStream(encrypted.DHKey));
-            if (err != null)
-            {
-                return (null, err);
-            }
             var pre = DhHelper.DhExchange(LongTermKey, dhKey);
             var gcm = DhHelper.CreateAEAD(pre, HkdfContext);
-            if (err != null)
-            {
-                return (null, err);
-            }
 
             byte[] decrypted = new byte[encrypted.Cipher.Length];
 
@@ -102,7 +101,73 @@ namespace dkg
 
             var deal = new Deal();
             deal.UnmarshalBinary(new MemoryStream(decrypted));
-            return (deal, err);
+            return deal;
+        }
+
+        // ProcessEncryptedDeal decrypt the deal received from the Dealer.
+        // If the deal is valid, i.e. the verifier can verify its shares
+        // against the public coefficients and the signature is valid, an approval
+        // response is returned and must be broadcasted to every participants
+        // including the dealer.
+        // If the deal itself is invalid, it returns a complaint response that must be
+        // broadcasted to every other participants including the dealer.
+        // If the deal has already been received, or the signature generation of the
+        // response failed, it returns an error without any responses.
+        public Response? ProcessEncryptedDeal(EncryptedDeal e)
+        {
+            try
+            {
+                var d = DecryptDeal(e);
+                if (d.SecShare.I != Index)
+                {
+                    throw new Exception("ProcessEncryptedDeal: got wrong index from deal");
+                }
+
+                var sid = Tools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
+
+                var r = new Response(sid, Index);
+
+                try
+                {
+                    Aggregator.VerifyDeal(d, true);
+                    r.Status = ResponseStatus.Approval;
+                }
+                catch
+                {
+                    r.Status = ResponseStatus.Complaint;
+                }
+
+                r.Signature = Schnorr.Sign(LongTermKey, r.Hash());
+
+                Aggregator.AddResponse(r);
+
+                return r;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        // SetTimeout marks the end of the protocol. The caller is expected to call this
+        // after a long timeout so each verifier can still deem its share valid if
+        // enough deals were approved. One should call `DealCertified()` after this
+        // method in order to know if the deal is valid or the protocol should abort.
+        public void SetTimeout()
+        {
+            Aggregator.Timeout = true;
+        }
+
+        // GetDeal returns the Deal that this verifier has received. It returns
+        // null if the deal is not certified or there is not enough approvals.
+        public Deal? GetDeal()
+        {
+            if (!Aggregator.DealCertified())
+            {
+                return null;
+            }
+            return Aggregator.Deal;
         }
     }
+
 }

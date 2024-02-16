@@ -23,6 +23,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 
 namespace DkgTests
@@ -49,14 +51,14 @@ namespace DkgTests
             _g = Suite.G;
             (_dealerSec, _dealerPub) = KeyPair();
             (_secret, _) = KeyPair();
-            _vssThreshold = Dealer.MinimumT(nbVerifiers);
+            _vssThreshold = Tools.MinimumT(nbVerifiers);
 
             _verifiersPub = [];
             _verifiersSec = [];
 
             (_verifiersSec, _verifiersPub) = GenCommits(nbVerifiers);
 
-            _goodT = Dealer.MinimumT(nbVerifiers);
+            _goodT = Tools.MinimumT(nbVerifiers);
         }
         private (IScalar prv, IPoint pub) KeyPair()
         {
@@ -79,18 +81,34 @@ namespace DkgTests
             return (secrets, publics);
         }
 
+        private Dealer GenDealer()
+        {
+            return new Dealer(_dealerSec, _secret, [ .._verifiersPub], _vssThreshold);
+        }
+
+        private (Dealer, List<Verifier>) GenAll()
+        {
+            var dealer = GenDealer();
+            var verifiers = new List<Verifier>(nbVerifiers);
+            for (var i = 0; i < nbVerifiers; i++)
+            {
+                var v = new Verifier(_verifiersSec[i], _dealerPub, [.. _verifiersPub]);
+                verifiers.Add(v);
+            }
+            return (dealer, verifiers);
+        }
+
         [Test]
         public void TestVSSDealerNew()
         {
-            int goodT = Dealer.MinimumT(nbVerifiers);
-            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, goodT);
+            Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], _goodT);
 
             int[] badTs = [0, 1, -4];
             foreach (int badT in badTs)
             {
                 Assert.Throws<ArgumentException>(() =>
                     {
-                        Dealer dealer = new(_dealerSec, _secret, _verifiersPub, badT);
+                        Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], badT);
                     });
             }
         }
@@ -100,28 +118,98 @@ namespace DkgTests
         {
             Random Random = new();
             int randIdx = Random.Next(_verifiersPub.Count);
-            Verifier v = new(_verifiersSec[randIdx], _dealerPub, _verifiersPub);
+            Verifier v = new(_verifiersSec[randIdx], _dealerPub, [.. _verifiersPub]);
 
             IScalar wrongKey = _g.Scalar();
             Assert.Throws<ArgumentException>(() =>
             {
-                Verifier wrongVerifier = new Verifier(wrongKey, _dealerPub, _verifiersPub);
+                Verifier wrongVerifier = new Verifier(wrongKey, _dealerPub, [.. _verifiersPub]);
             });
+        }
+
+
+        [Test]
+        public void TestVssShare()
+        {
+            var (dealer, verifiers) = GenAll();
+            var ver = verifiers[0];
+            var deal = dealer.EncryptedDeal(0);
+
+            var resp = ver.ProcessEncryptedDeal(deal);
+            Assert.That(resp, Is.Not.Null);
+            Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Approval));
+
+            var aggr = ver.Aggregator;
+            var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
+
+            for (int i = 1; i < aggr.T - 1; i++)
+            {
+                aggr.Responses[i] = new Response(sessionId, i) {  Status = ResponseStatus.Approval };
+            }
+
+            // Not enough approvals
+            Assert.That(ver.GetDeal(), Is.Null);
+
+            aggr.Responses[aggr.T] = new Response(sessionId, 0) { Status = ResponseStatus.Approval };
+
+            // Timeout all other (i > t) verifiers
+            ver.SetTimeout();
+
+            // Deal not certified
+            aggr.BadDealer = true;
+            Assert.That(ver.GetDeal(), Is.Null);
+            aggr.BadDealer = false;
+            Assert.That(ver.GetDeal(), Is.Not.Null);
+        }
+//!        [Test]
+        public void TestVssAggregatorDealCertified()
+        {
+            var dealer = GenDealer();
+            var aggr = dealer.Aggregator;
+
+            var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
+
+            for (int i = 1; i < aggr.T - 1; i++)
+            {
+                aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
+
+                // Mark remaining verifiers as timed-out
+                dealer.SetTimeout();
+
+                Assert.That(aggr.DealCertified(), Is.True);
+                // !!!       Assert.AreEqual(Suite.G.Point().Mul(_secret), dealer.SecretCommit());
+
+                // Bad dealer response
+                aggr.BadDealer = true;
+                Assert.That(aggr.DealCertified(), Is.False);
+                // !!!       Assert.IsNull(dealer.SecretCommit());
+
+                // Reset dealer status
+                aggr.BadDealer = false;
+
+                // Inconsistent state on purpose
+                // Too much complaints
+                for (i = 0; i < aggr.T; i++)
+                {
+                    aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Complaint };
+                }
+                Assert.That(aggr.DealCertified(), Is.False);
+            }
         }
 
         [Test]
         public void TestVssSessionId()
         {
-            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _vssThreshold);
+            Dealer dealer = GenDealer();
             IPoint[] commitments = [.. dealer.Deals[0].Commitments];
-            byte[] sid = dealer.CreateSessionId(_dealerPub, _verifiersPub, commitments, dealer.T);
+            byte[] sid = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.Not.Null);
 
-            byte[] sid2 = dealer.CreateSessionId(_dealerPub, _verifiersPub, commitments, dealer.T);
+            byte[] sid2 = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.EqualTo(sid2));
 
             IPoint wrongDealerPub = _dealerPub.Add(_dealerPub);
-            byte[] sid3 = dealer.CreateSessionId(wrongDealerPub, _verifiersPub, commitments, dealer.T);
+            byte[] sid3 = Tools.CreateSessionId(wrongDealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid3, Is.Not.Null);
             Assert.That(sid3, Is.Not.EqualTo(sid2));
         }
@@ -138,14 +226,14 @@ namespace DkgTests
         [Test]
         public void TestVssContext()
         {
-            byte[] context = DhHelper.Context(Suite.Hash, _dealerPub, _verifiersPub);
+            byte[] context = DhHelper.Context(Suite.Hash, _dealerPub, [.. _verifiersPub]);
             Assert.That(context, Has.Length.EqualTo(Suite.Hash.HashSize / 8));
         }
 
         [Test]
         public void TestVSSDealEquals()
         {
-            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _goodT);
+            Dealer dealer = GenDealer();
             Deal d = new();
 
             Assert.Multiple(() =>
@@ -161,7 +249,7 @@ namespace DkgTests
         [Test]
         public void TestVSSDealMarshaUnmarshal()
         {
-            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _goodT);
+            Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], _goodT);
             Deal d = new();
 
             MemoryStream stream = new();
@@ -175,9 +263,17 @@ namespace DkgTests
         [Test]
         public void TestVSSDealEncryptDecrypt()
         {
-            Dealer dealer = new(_dealerSec, _secret, _verifiersPub, _goodT);
-            var encrypted = dealer.EncryptedDeal(0);
-            Assert.That(encrypted, Is.Not.Null);
+            Random Random = new();
+            int randIdx = Random.Next(_verifiersPub.Count);
+
+            Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], _goodT);
+            EncryptedDeal encryptedDeal = dealer.EncryptedDeal(randIdx);
+            Assert.That(encryptedDeal, Is.Not.Null);
+
+            Verifier verifier = new(_verifiersSec[randIdx], _dealerPub, [.. _verifiersPub]);
+
+            Deal? decryptedDeal = verifier.DecryptDeal(encryptedDeal);
+            Assert.That(dealer.Deals[randIdx], Is.EqualTo(decryptedDeal));
         }
     }
 }

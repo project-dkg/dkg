@@ -27,7 +27,7 @@
 namespace dkg
 {
     // Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
-    public class Deal : Suite, IMarshalling, IEquatable<Deal>
+    public class Deal : IMarshalling, IEquatable<Deal>
     {
         // Unique session identifier for this protocol run
         public byte[] SessionId { get; set; }
@@ -50,7 +50,7 @@ namespace dkg
         {
             SessionId = [];
             Commitments = [];
-            SecShare = new(1, G.Scalar());
+            SecShare = new(1, Suite.G.Scalar());
         }
 
         public byte[] GetBytes()
@@ -143,5 +143,25 @@ namespace dkg
                 return hash;
             }
         }
+    }
+
+    // EncryptedDeal contains the deal in a encrypted form only decipherable by the
+    // correct recipient. The encryption is performed in a similar manner as what is
+    // done in TLS. The dealer generates a temporary key pair, signs it with its
+    // longterm secret key.
+    public class EncryptedDeal(byte[] dhKey, byte[] signatire, byte[] nounce, byte[] cipher, byte[] tag)
+    {
+        // Ephemeral Diffie Hellman key
+        public byte[] DHKey { get; set; } = dhKey;
+
+        // Signature of the DH key by the longterm key of the dealer
+        public byte[] Signature { get; set; } = signatire;
+
+        // Nonce used for the encryption
+        public byte[] Nonce { get; set; } = nounce;
+
+        // AEAD encryption of the marshalled deal 
+        public byte[] Cipher { get; set; } = cipher;
+        public byte[] Tag { get; set; } = tag;
     }
 }

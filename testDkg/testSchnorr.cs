@@ -29,18 +29,10 @@ namespace SchnorrTests
     [TestFixture]
     public class SchnorrTests
     {
-        private Secp256k1Group _g;
-
-        [SetUp]
-        public void Setup()
-        {
-            _g = new Secp256k1Group();
-        }
-
         private (IScalar prv, IPoint pub) KeyPair()
         {
-            var prv = _g.Scalar();
-            var pub = _g.Point().Base().Mul(prv);
+            var prv = Suite.G.Scalar();
+            var pub = Suite.G.Point().Base().Mul(prv);
             return (prv, pub);
         }
 
@@ -51,15 +43,15 @@ namespace SchnorrTests
 
             var ( prv, pub ) = KeyPair();
 
-            var s = Schnorr.Sign(_g, prv, msg);
+            var s = Schnorr.Sign(prv, msg);
             Assert.That(s, Is.Not.Null);
 
-            var err = Schnorr.Verify(_g, pub, msg, s);
+            var err = Schnorr.Verify(pub, msg, s);
             Assert.That(err, Is.Null);
 
             // wrong size
             var larger = s.Concat(new byte[] { 0x01, 0x02 }).ToArray();
-            Assert.That(Schnorr.Verify(_g, pub, msg, larger), Is.Not.Null);
+            Assert.That(Schnorr.Verify(pub, msg, larger), Is.Not.Null);
 
             // wrong challenge
             var wrongEncoding = new byte[] { 243, 45, 180, 140, 73, 23, 41, 212, 250, 87, 157, 243,
@@ -68,17 +60,17 @@ namespace SchnorrTests
             var wrChall = new byte[s.Length];
             wrongEncoding.CopyTo(wrChall, 0);
             s.Skip(32).ToArray().CopyTo(wrChall, 32);
-            Assert.That(Schnorr.Verify(_g, pub, msg, wrChall), Is.Not.Null);
+            Assert.That(Schnorr.Verify(pub, msg, wrChall), Is.Not.Null);
 
             // wrong response
             var wrResp = new byte[s.Length];
             s.Take(32).ToArray().CopyTo(wrResp, 0);
             wrongEncoding.CopyTo(wrResp, 32);
-            Assert.That(Schnorr.Verify(_g, pub, msg, wrResp), Is.Not.Null);
+            Assert.That(Schnorr.Verify(pub, msg, wrResp), Is.Not.Null);
 
             // wrong public key
             (_, pub) = KeyPair();
-            Assert.That(Schnorr.Verify(_g, pub, msg, s), Is.Not.Null);
+            Assert.That(Schnorr.Verify(pub, msg, s), Is.Not.Null);
         }
 
         [Test]
@@ -87,10 +79,10 @@ namespace SchnorrTests
             var msg = System.Text.Encoding.UTF8.GetBytes("Hello Schnorr");
             var (prv, pub) = KeyPair();
 
-            var s = Schnorr.Sign(_g, prv, msg);
+            var s = Schnorr.Sign(prv, msg);
             Assert.That(s, Is.Not.Null);
 
-            var err = Schnorr.Verify(_g, pub, msg, s);
+            var err = Schnorr.Verify(pub, msg, s);
             Assert.That(err, Is.Null);
         }
 
@@ -106,10 +98,10 @@ namespace SchnorrTests
             var msg = System.Text.Encoding.UTF8.GetBytes("Hello Schnorr");
             var (prv, pub) = KeyPair();
 
-            var s = Schnorr.Sign(_g, prv, msg);
+            var s = Schnorr.Sign(prv, msg);
             Assert.That(s, Is.Not.Null);
 
-            var err = Schnorr.Verify(_g, pub, msg, s);
+            var err = Schnorr.Verify(pub, msg, s);
             Assert.That(err, Is.Null);
 
             // Add l to signature
@@ -119,7 +111,7 @@ namespace SchnorrTests
                 s[32 + i] = (byte)c;
                 c >>= 8;
             }
-            err = Schnorr.Verify(_g, pub, msg, s);
+            err = Schnorr.Verify(pub, msg, s);
             Assert.That(err, Is.Not.Null);
         }
     }

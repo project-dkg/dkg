@@ -34,20 +34,12 @@ using System.Text;
 
 namespace dkg
 {
-    public enum Status
-    {
-        // StatusComplaint is a constant value meaning that a verifier issues
-        // a Complaint against its Dealer.
-        Complaint = 0,
-        // StatusApproval is a constant value meaning that a verifier agrees with
-        // the share it received.
-        Approval = 1
-    }
-
     public static class DhHelper
     {
         public const int sharedKeySize = 32;
         public const int nonceSizeInBytes = 12;
+        public const int tagSizeInBytes = 16;
+
         // dhExchange computes the shared key from a private key and a public key
         public static IPoint DhExchange(IScalar ownPrivate, IPoint remotePublic)
         {
@@ -60,7 +52,7 @@ namespace dkg
             var sharedKey = CreateHKDF(preSharedKey.GetBytes(), hkdfContext);
             var aes = Aes.Create();
             aes.Key = sharedKey;
-            return new AesGcm(aes.Key);
+            return new AesGcm(aes.Key, tagSizeInBytes);
         }
 
         public static byte[] CreateHKDF(byte[] preSharedKey, byte[] hkdfContext)
@@ -80,7 +72,7 @@ namespace dkg
 
 
         // Context returns the context slice to be used when encrypting a share
-        public static byte[] Context(HashAlgorithm hash, IPoint publicKey, List<IPoint> verifiers)
+        public static byte[] Context(HashAlgorithm hash, IPoint publicKey, IPoint[] verifiers)
         {
             MemoryStream strm = new();
             strm.Write(Encoding.UTF8.GetBytes("dkg-dealer"));
@@ -119,26 +111,15 @@ namespace dkg
 
         }
     }
-    public class Suite
+    public static class Suite
     {
         public static readonly IGroup G = new Secp256k1Group();
         public static readonly HashAlgorithm Hash = SHA256.Create();
     }
 
-    public class Verifiable(List<IPoint> verifiers): Suite
+    public static class Tools
     {
-        public List<IPoint> Verifiers { get; set; } = verifiers;
-
-        public IPoint FindPub(int idx)
-        {
-            if (idx >= Verifiers.Count || idx < 0)
-            {
-                throw new ArgumentOutOfRangeException(nameof(idx));
-            }
-            return Verifiers[idx];
-        }
-
-        public byte[] CreateSessionId(IPoint publicKey, List<IPoint> verifiers, IPoint[] secretCommits, int t)
+        public static byte[] CreateSessionId(IPoint publicKey, IPoint[] verifiers, IPoint[] commitments, int t)
         {
             MemoryStream strm = new();
             publicKey.MarshalBinary(strm);
@@ -147,18 +128,42 @@ namespace dkg
                 vrf.MarshalBinary(strm);
             }
 
-            foreach (var cmt in secretCommits)
+            foreach (var cmt in commitments)
             {
                 cmt.MarshalBinary(strm);
             }
             strm.Write(BitConverter.GetBytes((uint)t));
-            return Hash.ComputeHash(strm.ToArray());
+            return Suite.Hash.ComputeHash(strm.ToArray());
+        }
+
+        // MinimumT returns a safe value of T that balances secrecy and robustness.
+        // It expects n, the total number of participants.
+        // T should be adjusted to your threat model. Setting a lower T decreases the
+        // difficulty for an adversary to break secrecy. However, a too large T makes
+        // it possible for an adversary to prevent recovery (robustness).
+        public static int MinimumT(int n)
+        {
+            return (n + 1) / 2;
+        }
+
+        public static bool ValidT(int t, IPoint[] verifiers)
+        {
+            return t >= 2 && t <= verifiers.Length;
+        }
+
+        public static IPoint? FindPub(IPoint[] verifiers, int idx)
+        {
+            if (idx >= verifiers.Length || idx < 0)
+            {
+                return null;
+            }
+            return verifiers[idx];
         }
     }
 
     // Dealer encapsulates for creating and distributing the shares and for
     // replying to any Responses.
-    public class Dealer : Verifiable
+    public class Dealer
     {
 
         private readonly XOFHelper xof;
@@ -166,6 +171,7 @@ namespace dkg
         public IScalar LongTermKey { get; set; }
         public IPoint PublicKey { get; set; }
         public IScalar Secret { get; set; }
+        public IPoint[] Verifiers { get; set; }
         public List<IPoint> SecretCommits { get; set; }
         public PriPoly SecretPoly { get; set; }
         public byte[] HkdfContext { get; set; }
@@ -180,10 +186,9 @@ namespace dkg
         // a middle ground between robustness and secrecy. Increasing t will increase
         // the secrecy at the cost of the decreased robustness and vice versa. It 
         // returns an error if the t is inferior or equal to 2.
-        public Dealer(IScalar longterm, IScalar secret, List<IPoint> verifiers, int t) :
-            base(verifiers)
+        public Dealer(IScalar longterm, IScalar secret, IPoint[] verifiers, int t)
         {
-            if (!ValidT(t, verifiers))
+            if (!Tools.ValidT(t, verifiers))
             {
                 throw new ArgumentException($"Dealer: t {t} invalid");
             }
@@ -192,26 +197,27 @@ namespace dkg
             
             LongTermKey = longterm;
             Secret = secret;
+            Verifiers = verifiers;
             T = t;
 
-            var f = new PriPoly(G, T, Secret);
-            PublicKey = G.Point().Base().Mul(LongTermKey);
+            var f = new PriPoly(Suite.G, T, Secret);
+            PublicKey = Suite.G.Point().Base().Mul(LongTermKey);
 
             // Compute public polynomial coefficients
-            var F = f.Commit(G.Point().Base());
-            SecretCommits = [.. F.Commits];
+            var F = f.Commit(Suite.G.Point().Base());
+            //SecretCommits = [.. F.Commits];
 
-            SessionId = CreateSessionId(PublicKey, Verifiers, F.Commits, T);
+            SessionId = Tools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
 
-            Aggregator = new Aggregator(PublicKey, Verifiers, SecretCommits, T, SessionId);
+            Aggregator = new Aggregator(PublicKey, Verifiers, F.Commits, T, SessionId);
             // C = F + G
-            Deals = new Deal[Verifiers.Count];
-            for (int i = 0; i < Verifiers.Count; i++)
+            Deals = new Deal[Verifiers.Length];
+            for (int i = 0; i < Verifiers.Length; i++)
             {
                 var fi = f.Eval(i);
                 Deals[i] = new Deal(SessionId, fi, F.Commits, T);
             }
-            HkdfContext = DhHelper.Context(Hash, PublicKey, Verifiers);
+            HkdfContext = DhHelper.Context(Suite.Hash, PublicKey, Verifiers);
             SecretPoly = f;
         }
 
@@ -230,13 +236,13 @@ namespace dkg
         // verifier at index i.
         public EncryptedDeal EncryptedDeal(int i)
         {
-            var vPub = FindPub(i);
+            IPoint vPub = Tools.FindPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range"); 
             // gen ephemeral key
-            var dhSecret = G.Scalar();
-            var dhPublic = G.Point().Base().Mul(dhSecret);
+            var dhSecret = Suite.G.Scalar();
+            var dhPublic = Suite.G.Point().Base().Mul(dhSecret);
             // signs the public key
             var dhPublicBuff = dhPublic.GetBytes();
-            var signature = Schnorr.Sign(G, LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
+            var signature = Schnorr.Sign(LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
 
             // AES128-GCM
             var pre = DhHelper.DhExchange(dhSecret, vPub);
@@ -256,14 +262,22 @@ namespace dkg
         // corresponds to the index in the list of verifiers.
         public EncryptedDeal[] EncryptedDeals()
         {
-            var deals = new EncryptedDeal[Verifiers.Count];
-            for (int i = 0; i < Verifiers.Count; i++)
+            var deals = new EncryptedDeal[Verifiers.Length];
+            for (int i = 0; i < Verifiers.Length; i++)
             {
                 deals[i] = EncryptedDeal(i);
             }
             return deals;
         }
-        
+
+        // SetTimeout marks the end of a round, invalidating any missing (or future) response
+        // for this DKG protocol round. The caller is expected to call this after a long timeout
+        // so each DKG node can still compute its share if enough Deals are valid.
+        public void SetTimeout()
+        {
+            Aggregator.Timeout = true;
+        }
+
         // ProcessResponse analyzes the given Response. If it's a valid complaint, then
         // it returns a Justification. This Justification must be broadcasted to every
         // participants. If it's an invalid complaint, it returns an error about the
@@ -292,61 +306,10 @@ namespace dkg
               return j;
           }
         */
-        // MinimumT returns a safe value of T that balances secrecy and robustness.
-        // It expects n, the total number of participants.
-        // T should be adjusted to your threat model. Setting a lower T decreases the
-        // difficulty for an adversary to break secrecy. However, a too large T makes
-        // it possible for an adversary to prevent recovery (robustness).
-        public static int MinimumT(int n)
-        {
-            return (n + 1) / 2;
-        }
-
-        public static bool ValidT(int t, List<IPoint> verifiers)
-        {
-            return t >= 2 && t <= verifiers.Count && t == (uint)t;
-        }
-
     }
 
-    // EncryptedDeal contains the deal in a encrypted form only decipherable by the
-    // correct recipient. The encryption is performed in a similar manner as what is
-    // done in TLS. The dealer generates a temporary key pair, signs it with its
-    // longterm secret key.
-    public class EncryptedDeal(byte[] dhKey, byte[] signatire, byte[] nounce, byte[] cipher, byte[] tag)
-    {
-        // Ephemeral Diffie Hellman key
-        public byte[] DHKey { get; set; } = dhKey;
-
-        // Signature of the DH key by the longterm key of the dealer
-        public byte[] Signature { get; set; } = signatire;
-
-        // Nonce used for the encryption
-        public byte[] Nonce { get; set; } = nounce;
-
-        // AEAD encryption of the marshalled deal 
-        public byte[] Cipher { get; set; } = cipher;
-        public byte[] Tag { get; set; } = tag;
-    }
-
-    // Response is sent by the verifiers to all participants and holds each
-    // individual validation or refusal of a Deal.
-    public class Response: Suite
-    {
-        // SessionId related to this run of the protocol
-        public byte[] SessionId { get; set; }
-
-        // Index of the verifier issuing this Response from the new set of nodes
-        public uint Index { get; set; }
-
-        // false = NO APPROVAL == Complaint , true = APPROVAL
-        public Status Status { get; set; }
-
-        // Signature over the whole packet
-        public byte[] Signature { get; set; }
-    }
-
-    public class Justification: Suite
+ 
+    public class Justification
     {
         // SessionId related to the current run of the protocol
         public byte[] SessionId { get; set; }
@@ -361,53 +324,4 @@ namespace dkg
         public byte[] Signature { get; set; }
     }
 
-    // Aggregator is used to collect all deals, and responses for one protocol run.
-    // It brings common functionalities for both Dealer and Verifier structs.
-    public class Aggregator: Verifiable
-    {
-        public IPoint Dealer { get; set; }
-        public List<IPoint> Commits { get; set; }
-        public Dictionary<uint, Response> Responses { get; set; }
-        public byte[] Sid { get; set; }
-        public Deal Deal { get; set; }
-        public int T { get; set; }
-        public bool BadDealer { get; set; }
-        public bool Timeout { get; set; }
-        public Aggregator(IPoint dealer, List<IPoint> verifiers, List<IPoint> commitments, int t, byte[] sid):
-            base(verifiers)
-        {
-            Dealer = dealer;
-            Commits = commitments;
-            T = t;
-            Sid = sid;
-            Responses = new Dictionary<uint, Response>();
-        }
-
-        // New Empty Aggregator returns a structure capable of storing Responses about a
-        // deal and check if the deal is certified or not.
-        public Aggregator(List<IPoint> verifiers):
-            base(verifiers)
-        {
-            Responses = new Dictionary<uint, Response>();
-        }
-
-/*        public string VerifyResponse(Response r)
-        {
-            if (Sid != null && !Sid.SequenceEqual(r.SessionId))
-            {
-                return "vss: receiving inconsistent sessionId in response";
-            }
-
-            var pub = FindPub(r.Index);
-
-            var error = Schnorr.Verify(g, pub, r.Hash(g), r.Signature);
-            if (error != null)
-            {
-                return error;
-            }
-
-            return AddResponse(r);
-        }
-*/
-    }
 }
