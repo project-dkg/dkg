@@ -23,6 +23,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg;
+
 namespace ShareTests
 {
     public class ShareComparerTests
@@ -76,6 +78,37 @@ namespace ShareTests
             Share? share2 = null;
             Assert.Throws<ArgumentNullException>(() => _comparer.Compare(share1, share2));
         }
+
+        public class ShareTests
+        {
+            [Test]
+            public void TestEquals()
+            {
+                Share share1 = new(10);
+                Share share2 = new(20);
+                Share share3 = new(20);
+
+                Assert.That(share1, Is.Not.EqualTo(null));
+                Assert.That(share1, Is.Not.EqualTo(share2));
+                Assert.That(share3, Is.EqualTo(share2));
+                Assert.That(share1.GetHashCode(), Is.Not.EqualTo(share2.GetHashCode()));
+                Assert.That(share3.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+            }
+
+            [Test]
+            public void TestMarshalUnmarshalBinary()
+            {
+                Share share1 = new(10);
+                MemoryStream stream = new();
+                share1.MarshalBinary(stream);
+                Assert.That(stream.Length, Is.EqualTo(share1.MarshalSize()));
+                stream.Position = 0;
+                Share share2 = new(20);
+                share2.UnmarshalBinary(stream);
+                Assert.That(share1, Is.EqualTo(share2));
+                Assert.That(share1.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+            }
+        }
     }
     public class PriShareTests
     {
@@ -88,7 +121,7 @@ namespace ShareTests
         {
             _scalar = new Secp256k1Scalar().One();
             _priShare = new PriShare(5, _scalar);
-            _hashAlgorithm = SHA256.Create();
+            _hashAlgorithm = Suite.Hash;
         }
 
         [Test]
@@ -104,8 +137,8 @@ namespace ShareTests
         [Test]
         public void TestHash()
         {
-            byte[] h = [75, 245, 18, 47, 52, 69, 84, 197, 59, 222, 46, 187, 140, 210, 183, 227, 
-                        209, 96, 10, 214, 49, 195, 133, 165, 215, 204, 226, 60, 119, 133, 69, 154, 5, 0, 0, 0];
+            byte[] h = [236, 73, 22, 221, 40, 252, 76, 16, 215, 142, 40, 124, 165, 217, 204, 81, 
+                        238, 26, 231, 60, 191, 222, 8, 198, 179, 115, 36, 203, 250, 172, 139, 197, 5, 0, 0, 0];
             var hash = _priShare.Hash(_hashAlgorithm);
             Assert.That(hash, Is.EqualTo(h));
         }
@@ -114,7 +147,41 @@ namespace ShareTests
         public void TestToString()
         {
             var str = _priShare.ToString();
-            Assert.That(str, Is.EqualTo("{PriShare: I = 5; V = {Secp256k1 Scalar: Value = 1}}"));
+            Assert.That(str, Is.EqualTo("{PriShare: I = 5; V = {Secp256k1 Scalar: 1}}"));
+        }
+
+        [Test]
+        public void TestEquals()
+        {
+            Secp256k1Scalar scalar2 = new Secp256k1Scalar();
+            PriShare priShare2 = new(20, scalar2);
+            PriShare priShare3 = new(20, scalar2);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(_priShare, Is.Not.EqualTo(null));
+                Assert.That(_priShare, Is.Not.EqualTo(priShare2));
+                Assert.That(priShare3, Is.EqualTo(priShare2));
+                Assert.That(_priShare.GetHashCode(), Is.Not.EqualTo(priShare2.GetHashCode()));
+                Assert.That(priShare3.GetHashCode(), Is.EqualTo(priShare2.GetHashCode()));
+            });
+        }
+
+        [Test]
+        public void TestMarshalUnmarshalBinary()
+        {
+            MemoryStream stream = new();
+            _priShare.MarshalBinary(stream);
+            Assert.That(stream.Length, Is.EqualTo(_priShare.MarshalSize()));
+            stream.Position = 0;
+            Secp256k1Scalar scalar2 = new Secp256k1Scalar();
+            PriShare share2 = new(20, scalar2);
+            share2.UnmarshalBinary(stream);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_priShare, Is.EqualTo(share2));
+                Assert.That(_priShare.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+            });
         }
     }
 
@@ -129,7 +196,7 @@ namespace ShareTests
         {
             _point = new Secp256k1Point().Base();
             _pubShare = new PubShare(7, _point);
-            _hashAlgorithm = SHA256.Create();
+            _hashAlgorithm = Suite.Hash;
         }
 
         [Test]
@@ -156,8 +223,43 @@ namespace ShareTests
         {
             var str = _pubShare.ToString();
             Assert.That(str, Is.EqualTo("{PubShare: I = 7; V = {Secp256k1 Point: " + 
-                                        "X = 79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798, " + 
-                                        "Y = 483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8}}"));
+                                        "(79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798," + 
+                                        "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8," +
+                                        "1,0)}}"));
         }
+        [Test]
+        public void TestEquals()
+        {
+            IPoint point2 = new Secp256k1Point().Base().Mul(new Secp256k1Scalar().SetInt64(37));
+            PubShare pubShare2 = new(12, point2);
+            PubShare pubShare3 = new(12, point2);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(_pubShare, Is.Not.EqualTo(null));
+                Assert.That(_pubShare, Is.Not.EqualTo(pubShare2));
+                Assert.That(pubShare3, Is.EqualTo(pubShare2));
+                Assert.That(_pubShare.GetHashCode(), Is.Not.EqualTo(pubShare2.GetHashCode()));
+                Assert.That(pubShare3.GetHashCode(), Is.EqualTo(pubShare2.GetHashCode()));
+            });
+        }
+
+        [Test]
+        public void TestMarshalUnmarshalBinary()
+        {
+            MemoryStream stream = new();
+            _pubShare.MarshalBinary(stream);
+            Assert.That(stream.Length, Is.EqualTo(_pubShare.MarshalSize()));
+            stream.Position = 0;
+            IPoint point2 = new Secp256k1Point().Base().Mul(new Secp256k1Scalar().SetInt64(67));
+            PubShare share2 = new(20, point2);
+            share2.UnmarshalBinary(stream);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_pubShare, Is.EqualTo(share2));
+                Assert.That(_pubShare.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+            });
+        }
+
     }
 }

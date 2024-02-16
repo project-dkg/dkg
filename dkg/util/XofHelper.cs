@@ -23,60 +23,22 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
+using Org.BouncyCastle.Crypto.Digests;
 
 namespace dkg
 {
-    // Class RandomStream implements a view random number generator as a stream
-    public class RandomStream : Stream
+    public class XOFHelper
     {
-        private RandomNumberGenerator _rng;
-
-        public RandomStream()
+        private const int _keySize = 128;
+        private const int _digestSize = 256;
+        private readonly ShakeDigest shake = new(_digestSize);
+        public byte[] XOF(byte[] data)
         {
-            _rng = RandomNumberGenerator.Create();
-        }
-
-        public override bool CanRead => true;
-
-        public override bool CanSeek => false;
-
-        public override bool CanWrite => false;
-
-        public override long Length => throw new NotSupportedException();
-
-        public override long Position
-        {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
-        }
-
-        public override void Flush()
-        {
-            throw new NotSupportedException();
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var data = new byte[count];
-            _rng.GetBytes(data);
-            Array.Copy(data, 0, buffer, offset, count);
-            return count;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
+            shake.BlockUpdate(data, 0, data.Length);
+            var result = new byte[_keySize];
+            shake.DoFinal(result, 0);
+            return result;
         }
     }
+
 }

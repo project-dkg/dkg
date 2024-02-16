@@ -34,7 +34,7 @@ namespace ShamirAndPolyTests
             var g = new Secp256k1Group();
             int n = 10;
             int t = n / 2 + 1;
-            var poly = new PriPoly(g, t, null, new RandomStream());
+            var poly = new PriPoly(g, t, null);
             var shares = poly.Shares(n);
 
             var recovered = PriPoly.RecoverSecret(g, shares, t, n);
@@ -62,7 +62,7 @@ namespace ShamirAndPolyTests
             var g = new Secp256k1Group();
             int n = 10;
             int t = n / 2 + 1;
-            var poly = new PriPoly(g, t, null, new RandomStream());
+            var poly = new PriPoly(g, t, null);
             var shares = poly.Shares(n);
 
             var selected = shares.ToList().GetRange(n - t, t);
@@ -83,7 +83,7 @@ namespace ShamirAndPolyTests
             var g = new Secp256k1Group();
             int n = 10;
             int t = n / 2 + 1;
-            var poly = new PriPoly(g, t, null, new RandomStream());
+            var poly = new PriPoly(g, t, null);
             var shares = poly.Shares(n);
 
             var selected = shares.ToList().GetRange(n - t, t - 1);
@@ -98,7 +98,7 @@ namespace ShamirAndPolyTests
             var g = new Secp256k1Group();
             int n = 10;
             int t = n / 2 + 1;
-            var poly = new PriPoly(g, t, null, new RandomStream());
+            var poly = new PriPoly(g, t, null);
             var shares = poly.Shares(n).ToList();
 
             // Remove a few shares
@@ -127,9 +127,9 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            PriPoly p1 = new(g, t, null, new RandomStream());
-            PriPoly p2 = new(g, t, null, new RandomStream());
-            PriPoly p3 = new(g, t, null, new RandomStream());
+            PriPoly p1 = new(g, t, null);
+            PriPoly p2 = new(g, t, null);
+            PriPoly p3 = new(g, t, null);
 
             PriPoly p12 = p1.Add(p2);
             PriPoly p13 = p1.Add(p3);
@@ -146,8 +146,8 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var p = new PriPoly(g, t, null, new RandomStream());
-            var q = new PriPoly(g, t, null, new RandomStream());
+            var p = new PriPoly(g, t, null);
+            var q = new PriPoly(g, t, null);
 
             var r = p.Add(q);
 
@@ -164,8 +164,8 @@ namespace ShamirAndPolyTests
             var g = new Secp256k1Group();
             int n = 10;
             int t = n / 2 + 1;
-            var a = new PriPoly(g, t, null, new RandomStream());
-            var b = new PriPoly(g, t, null, new RandomStream());
+            var a = new PriPoly(g, t, null);
+            var b = new PriPoly(g, t, null);
 
             var c = a.Mul(b);
             Assert.That(c.Coeffs, Has.Length.EqualTo(a.Coeffs.Length + b.Coeffs.Length - 1));
@@ -192,19 +192,19 @@ namespace ShamirAndPolyTests
         [Test]
         public void TestPriPolyRecover()
         {
-            var suite = new Secp256k1Group();
+            var g = new Secp256k1Group();
             int n = 10;
             int t = n / 2 + 1;
-            var a = new PriPoly(suite, t, null, new RandomStream());
+            var a = new PriPoly(g, t, null);
 
             var shares = a.Shares(n);
             var reverses = shares;
             reverses.Reverse();
 
-            var recovered = PriPoly.RecoverPriPoly(suite, shares, t, n);
+            var recovered = PriPoly.RecoverPriPoly(g, shares, t, n);
             Assert.That(recovered, Is.Not.Null);
 
-            var reverseRecovered = PriPoly.RecoverPriPoly(suite, reverses, t, n);
+            var reverseRecovered = PriPoly.RecoverPriPoly(g, reverses, t, n);
             Assert.That(reverseRecovered, Is.Not.Null);
 
             for (int i = 0; i < t; i++)
@@ -217,15 +217,15 @@ namespace ShamirAndPolyTests
         [Test]
         public void TestPriPolyCoefficients()
         {
-            var suite = new Secp256k1Group();
+            var g = new Secp256k1Group();
             int n = 10;
             int t = n / 2 + 1;
-            var a = new PriPoly(suite, t, null, new RandomStream());
+            var a = new PriPoly(g, t, null);
 
             var coeffs = a.Coeffs;
             Assert.That(t, Is.EqualTo(coeffs.Length));
 
-            var b = new PriPoly(suite, coeffs);
+            var b = new PriPoly(g, coeffs);
             CollectionAssert.AreEqual(a.Coeffs, b.Coeffs);
         }
     }
@@ -240,11 +240,11 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var G = g.Point().Pick(new RandomStream());
-            var H = g.Point().Pick(new RandomStream());
+            var G = g.Point();
+            var H = g.Point();
 
-            var p = new PriPoly(g, t, null, new RandomStream());
-            var q = new PriPoly(g, t, null, new RandomStream());
+            var p = new PriPoly(g, t, null);
+            var q = new PriPoly(g, t, null);
 
             var P = p.Commit(G);
             var Q = q.Commit(H);
@@ -268,11 +268,11 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var G = g.Point().Pick(new RandomStream());
+            var G = g.Point();
 
-            var p1 = new PriPoly(g, t, null, new RandomStream());
-            var p2 = new PriPoly(g, t, null, new RandomStream());
-            var p3 = new PriPoly(g, t, null, new RandomStream());
+            var p1 = new PriPoly(g, t, null);
+            var p2 = new PriPoly(g, t, null);
+            var p3 = new PriPoly(g, t, null);
 
             var P1 = p1.Commit(G);
             var P2 = p2.Commit(G);
@@ -294,7 +294,7 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var priPoly = new PriPoly(g, t, null, new RandomStream());
+            var priPoly = new PriPoly(g, t, null);
             var priShares = priPoly.Shares(n);
             var pubPoly = priPoly.Commit();
 
@@ -315,7 +315,7 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var priPoly = new PriPoly(g, t, null, new RandomStream());
+            var priPoly = new PriPoly(g, t, null);
             var pubPoly = priPoly.Commit();
             var pubShares = pubPoly.Shares(n);
 
@@ -333,7 +333,7 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var priPoly = new PriPoly(g, t, null, new RandomStream());
+            var priPoly = new PriPoly(g, t, null);
             var pubPoly = priPoly.Commit(g.Point().Base());
             var pubShares = pubPoly.Shares(n);
 
@@ -354,7 +354,7 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var priPoly = new PriPoly(g, t, null, new RandomStream());
+            var priPoly = new PriPoly(g, t, null);
             var pubPoly = priPoly.Commit();
             var shares = pubPoly.Shares(n).ToList();
 
@@ -375,7 +375,7 @@ namespace ShamirAndPolyTests
             int n = 10;
             int t = n / 2 + 1;
 
-            var priPoly = new PriPoly(g, t, null, new RandomStream());
+            var priPoly = new PriPoly(g, t, null);
             var pubPoly = priPoly.Commit();
             var shares = pubPoly.Shares(n).ToList();
 

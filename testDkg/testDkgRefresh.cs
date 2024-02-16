@@ -26,7 +26,7 @@
 namespace DkgTests
 {
     [TestFixture]
-    public class DkgTests
+    public class DkgRefreshTests
     {
         [Test]
         public void TestRefreshDKG()
@@ -42,7 +42,7 @@ namespace DkgTests
             var pubShares = new PubShare[n][];
             for (int i = 0; i < n; i++)
             {
-                priPolys[i] = new PriPoly(g, t, null, new RandomStream());
+                priPolys[i] = new PriPoly(g, t, null);
                 priShares[i] = priPolys[i].Shares(n);
                 pubPolys[i] = priPolys[i].Commit();
                 pubShares[i] = pubPolys[i].Shares(n);
@@ -101,7 +101,7 @@ namespace DkgTests
             // Create subshares and subpolys
             for (int i = 0; i < n; i++)
             {
-                subPriPolys[i] = new PriPoly(g, t, dkgShares[i].V, new RandomStream());
+                subPriPolys[i] = new PriPoly(g, t, dkgShares[i].V);
                 subPriShares[i] = subPriPolys[i].Shares(n);
                 subPubPolys[i] = subPriPolys[i].Commit();
                 subPubShares[i] = subPubPolys[i].Shares(n);

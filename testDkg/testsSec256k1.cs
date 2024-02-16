@@ -39,7 +39,7 @@ namespace Secp256k1Tests
             _scalar = new Secp256k1Scalar();
             _zero = new Secp256k1Scalar().Zero();
             _one = new Secp256k1Scalar().One();
-    }
+        }
 
         [Test]
         public void TestEquals()

@@ -1,50 +1,55 @@
-﻿using Org.BouncyCastle.Crypto.Digests;
+﻿// Copyright (C) 2024 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+// This file is a part of dkg applcation
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Crypto.Generators;
+
 using System.Security.Cryptography;
-using System.Text;
 
 namespace dkg
 {
-    public enum Status
+    public static class Suite
     {
-        // StatusComplaint is a constant value meaning that a verifier issues
-        // a Complaint against its Dealer.
-        Complaint = 0,
-        // StatusApproval is a constant value meaning that a verifier agrees with
-        // the share it received.
-        Approval = 1
-    }
-
-    public class XOFHelper
-    {
-        private const int _keySize = 128;
-        private const int _digestSize = 256;
-        private readonly ShakeDigest shake = new(_digestSize);
-        public byte[] XOF(byte[] data)
-        {
-            shake.BlockUpdate(data, 0, data.Length);
-            var result = new byte[_keySize];
-            shake.DoFinal(result, 0);
-            return result;
-        }
+        public static readonly IGroup G = new Secp256k1Group();
+        public static readonly HashAlgorithm Hash = SHA256.Create();
     }
 
     // Dealer encapsulates for creating and distributing the shares and for
-     // replying to any Responses.
+    // replying to any Responses.
     public class Dealer
     {
-        private readonly IGroup g;
-        private readonly XOFHelper h;
-        public Stream Reader { get; set; }
-        public IScalar Long { get; set; }
-        public IPoint Pub { get; set; }
+
+        public IScalar LongTermKey { get; set; }
+        public IPoint PublicKey { get; set; }
         public IScalar Secret { get; set; }
-        public List<IPoint> SecretCommits { get; set; }
+        public IPoint[] Verifiers { get; set; }
         public PriPoly SecretPoly { get; set; }
-        public List<IPoint> Verifiers { get; set; }
         public byte[] HkdfContext { get; set; }
         public int T { get; set; }
-        public byte[] SessionID { get; set; }
-        public List<Deal> Deals { get; set; }
+        public byte[] SessionId { get; set; }
+        public Deal[] Deals { get; set; }
         public Aggregator Aggregator { get; set; }
 
         // NewDealer returns a Dealer capable of leading the secret sharing scheme. It
@@ -53,194 +58,123 @@ namespace dkg
         // a middle ground between robustness and secrecy. Increasing t will increase
         // the secrecy at the cost of the decreased robustness and vice versa. It 
         // returns an error if the t is inferior or equal to 2.
-        public Dealer(IGroup group, IScalar longterm, IScalar secret, List<IPoint> verifiers, int t)
+        public Dealer(IScalar longterm, IScalar secret, IPoint[] verifiers, int t)
         {
-            if (!ValidT(t, verifiers))
+            if (!Tools.ValidT(t, verifiers))
             {
                 throw new ArgumentException($"Dealer: t {t} invalid");
             }
 
-            g = group;
-            h = new XOFHelper();
-
-            Long = longterm;
+            LongTermKey = longterm;
             Secret = secret;
             Verifiers = verifiers;
             T = t;
 
-            var f = new PriPoly(g, T, Secret, new RandomStream());
-            Pub = g.Point().Base().Mul(Long);
+            var f = new PriPoly(Suite.G, T, Secret);
+            PublicKey = Suite.G.Point().Base().Mul(LongTermKey);
 
             // Compute public polynomial coefficients
-            var F = f.Commit(g.Point().Base());
-            SecretCommits = F.Commits.ToList();
+            var F = f.Commit(Suite.G.Point().Base());
+            //SecretCommits = [.. F.Commits];
 
-            SessionID = CreateSessionID();
+            SessionId = Tools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
 
-            Aggregator = new Aggregator(g, Pub, Verifiers, SecretCommits, T, SessionID);
+            Aggregator = new Aggregator(PublicKey, Verifiers, F.Commits, T, SessionId);
             // C = F + G
-            Deals = new List<Deal>(Verifiers.Count);
-            for (int i = 0; i < Verifiers.Count; i++)
+            Deals = new Deal[Verifiers.Length];
+            for (int i = 0; i < Verifiers.Length; i++)
             {
                 var fi = f.Eval(i);
-                Deals[i] = new Deal
-                {
-                    SessionID = SessionID,
-                    SecShare = fi,
-                    Commitments = SecretCommits,
-                    T = (uint)T
-                };
+                Deals[i] = new Deal(SessionId, fi, F.Commits, T);
             }
-            HkdfContext = CreateContextID();
+            HkdfContext = DhHelper.Context(Suite.Hash, PublicKey, Verifiers);
             SecretPoly = f;
         }
 
-        // MinimumT returns a safe value of T that balances secrecy and robustness.
-        // It expects n, the total number of participants.
-        // T should be adjusted to your threat model. Setting a lower T decreases the
-        // difficulty for an adversary to break secrecy. However, a too large T makes
-        // it possible for an adversary to prevent recovery (robustness).
-        public static int MinimumT(int n)
+        // PlaintextDeal returns the plaintext version of the deal destined for peer i.
+        // Use this only for testing.
+        public Deal PlaintextDeal(int i)
         {
-            return (n + 1) / 2;
-        }
-
-        public static bool ValidT(int t, List<IPoint> verifiers)
-        {
-            return t >= 2 && t <= verifiers.Count && t == (uint)t;
-        }
-
-        public byte[] CreateSessionID()
-        {
-            MemoryStream strm = new();
-            Pub.MarshalBinary(strm);
-            foreach (var vrf in Verifiers)
+            if (i >= Deals.Length || i < 0)
             {
-                vrf.MarshalBinary(strm);
+                throw new ArgumentOutOfRangeException(nameof(i));
             }
+            return Deals[i];
+        }
 
-            foreach (var cmt in SecretCommits)
+        // EncryptedDeal returns the encryption of the deal that must be given to the
+        // verifier at index i.
+        public EncryptedDeal EncryptedDeal(int i)
+        {
+            IPoint vPub = Tools.FindPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range"); 
+            // gen ephemeral key
+            var dhSecret = Suite.G.Scalar();
+            var dhPublic = Suite.G.Point().Base().Mul(dhSecret);
+            // signs the public key
+            var dhPublicBuff = dhPublic.GetBytes();
+            var signature = Schnorr.Sign(LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
+
+            // AES128-GCM
+            var pre = DhHelper.DhExchange(dhSecret, vPub);
+            var gcm = DhHelper.CreateAEAD(pre, HkdfContext) ?? throw new Exception("EncryptedDeal: error creating new AEAD");
+            var nonce = new byte[DhHelper.nonceSizeInBytes];
+
+            var deal = Deals[i].GetBytes();
+            byte[] encrypted = new byte[deal.Length];
+            byte[] tag = new byte[gcm.TagSizeInBytes ?? 16];
+            gcm.Encrypt(nonce, deal, encrypted, tag);
+
+            return new EncryptedDeal(dhPublicBuff, signature, nonce, encrypted, tag);
+        }
+
+        // EncryptedDeals calls `EncryptedDeal` for each index of the verifier and
+        // returns the list of encrypted deals. Each index in the returned list
+        // corresponds to the index in the list of verifiers.
+        public EncryptedDeal[] EncryptedDeals()
+        {
+            var deals = new EncryptedDeal[Verifiers.Length];
+            for (int i = 0; i < Verifiers.Length; i++)
             {
-                cmt.MarshalBinary(strm);
+                deals[i] = EncryptedDeal(i);
             }
-            strm.Write(BitConverter.GetBytes((uint)T));
-            return h.XOF(strm.ToArray());
+            return deals;
         }
 
-        public byte[] CreateContextID()
+        // SetTimeout marks the end of a round, invalidating any missing (or future) response
+        // for this DKG protocol round. The caller is expected to call this after a long timeout
+        // so each DKG node can still compute its share if enough Deals are valid.
+        public void SetTimeout()
         {
-            MemoryStream strm = new();
-            strm.Write(Encoding.UTF8.GetBytes("vss-dealer"));
-            Pub.MarshalBinary(strm);
-            strm.Write(Encoding.UTF8.GetBytes("vss-verifiers"));
-            foreach (var vrf in Verifiers)
+            Aggregator.Timeout = true;
+        }
+
+        // SecretCommit returns the commitment of the secret being shared by this
+        // dealer. This function is only to be called once the deal has enough approvals
+        // and is verified otherwise it returns nil.
+        public IPoint? SecretCommit()
+        {
+            if (!Aggregator.DealCertified())
             {
-                vrf.MarshalBinary(strm);
+                return null;
             }
-            return h.XOF(strm.ToArray());
+            return Suite.G.Point().Base().Mul(Secret);
         }
-    }
 
-    // Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
-    public class Deal
-    {
-        // Unique session identifier for this protocol run
-        public byte[] SessionID { get; set; }
 
-        // Private share generated by the dealer
-        public PriShare SecShare { get; set; }
-
-        // Threshold used for this secret sharing run
-        public uint T { get; set; }
-
-        // Commitments are the coefficients used to verify the shares against
-        public List<IPoint> Commitments { get; set; }
-    }
-
-    // EncryptedDeal contains the deal in a encrypted form only decipherable by the
-    // correct recipient. The encryption is performed in a similar manner as what is
-    // done in TLS. The dealer generates a temporary key pair, signs it with its
-    // longterm secret key.
-    public class EncryptedDeal
-    {
-        // Ephemeral Diffie Hellman key
-        public byte[] DHKey { get; set; }
-
-        // Signature of the DH key by the longterm key of the dealer
-        public byte[] Signature { get; set; }
-
-        // Nonce used for the encryption
-        public byte[] Nonce { get; set; }
-
-        // AEAD encryption of the deal marshalled by protobuf
-        public byte[] Cipher { get; set; }
-    }
-
-    // Response is sent by the verifiers to all participants and holds each
-    // individual validation or refusal of a Deal.
-    public class Response
-    {
-        // SessionID related to this run of the protocol
-        public byte[] SessionID { get; set; }
-
-        // Index of the verifier issuing this Response from the new set of nodes
-        public uint Index { get; set; }
-
-        // false = NO APPROVAL == Complaint , true = APPROVAL
-        public Status Status { get; set; }
-
-        // Signature over the whole packet
-        public byte[] Signature { get; set; }
-    }
-
-    public class Justification
-    {
-        // SessionID related to the current run of the protocol
-        public byte[] SessionID { get; set; }
-
-        // Index of the verifier who issued the Complaint,i.e. index of this Deal
-        public uint Index { get; set; }
-
-        // Deal in cleartext
-        public Deal Deal { get; set; }
-
-        // Signature over the whole packet
-        public byte[] Signature { get; set; }
-    }
-
-    // Aggregator is used to collect all deals, and responses for one protocol run.
-    // It brings common functionalities for both Dealer and Verifier structs.
-    public class Aggregator
-    {
-        private readonly IGroup g;
-        public IPoint Dealer { get; set; }
-        public List<IPoint> Verifiers { get; set; }
-        public List<IPoint> Commits { get; set; }
-        public Dictionary<uint, Response> Responses { get; set; }
-        public byte[] Sid { get; set; }
-        public Deal Deal { get; set; }
-        public int T { get; set; }
-        public bool BadDealer { get; set; }
-        public bool Timeout { get; set; }
-        public Aggregator(IGroup group, IPoint dealer, List<IPoint> verifiers, List<IPoint> commitments, int t, byte[] sid)
+        // ProcessResponse analyzes the given Response. If it's a valid complaint, then
+        // it returns a Justification. This Justification must be broadcasted to every
+        // participants. If it's an invalid complaint, it returns an error about the
+        // complaint. The verifiers will also ignore an invalid Complaint.
+        public Justification? ProcessResponse(Response r)
         {
-            g = group;
-            Dealer = dealer;
-            Verifiers = verifiers;
-            Commits = commitments;
-            T = t;
-            Sid = sid;
-            Responses = new Dictionary<uint, Response>();
-        }
+            Aggregator.VerifyResponse(r);
+            if (r.Status == ResponseStatus.Approval)
+                return null;
 
-        // New Empty Aggregator returns a structure capable of storing Responses about a
-        // deal and check if the deal is certified or not.
-        public Aggregator(IGroup group, List<IPoint> verifiers)
-        {
-            g = group;
-            Verifiers = verifiers;
-            Responses = new Dictionary<uint, Response>();
+            var j = new Justification(SessionId, r.Index, Deals[r.Index]);
+            j.Signature = Schnorr.Sign(LongTermKey, j.Hash());
+            return j;
         }
-
+        
     }
 }
