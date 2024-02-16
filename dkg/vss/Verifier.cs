@@ -40,7 +40,7 @@ namespace dkg
         internal int Index { get; }
         internal byte[] HkdfContext { get; }
         internal Aggregator Aggregator { get; }
-        public string? LastError { get; set; }
+        public string? LastProcessingError { get; set; }
 
         // Constructor returns a Verifier out of:
         //   - its longterm secret key
@@ -52,7 +52,7 @@ namespace dkg
         // it with `verifier.SetT()`.
         public Verifier(IScalar longterm, IPoint dealerKey, IPoint[] verifiers)
         {
-            LastError = null;
+            LastProcessingError = null;
             LongTermKey = longterm;
             DealerKey = dealerKey;
             PublicKey = Suite.G.Point().Base().Mul(LongTermKey);
@@ -81,27 +81,36 @@ namespace dkg
 
         public Deal? DecryptDeal(EncryptedDeal encrypted)
         {
+            LastProcessingError = null;
             // verify signature
-            string? error = Schnorr.Verify(DealerKey, encrypted.DHKey, encrypted.Signature);
-            if (error != null)
+            try
             {
-                LastError = error;
+                string? error = Schnorr.Verify(DealerKey, encrypted.DHKey, encrypted.Signature);
+                if (error != null)
+                {
+                    LastProcessingError = error;
+                    return null;
+                }
+
+                // compute shared key and AES526-GCM cipher
+                var dhKey = Suite.G.Point();
+                dhKey.UnmarshalBinary(new MemoryStream(encrypted.DHKey));
+                var pre = DhHelper.DhExchange(LongTermKey, dhKey);
+                var gcm = DhHelper.CreateAEAD(pre, HkdfContext);
+
+                byte[] decrypted = new byte[encrypted.Cipher.Length];
+
+                gcm.Decrypt(encrypted.Nonce, encrypted.Cipher, encrypted.Tag, decrypted);
+
+                var deal = new Deal();
+                deal.UnmarshalBinary(new MemoryStream(decrypted));
+                return deal;
+            } 
+            catch (Exception ex) 
+            {
+                LastProcessingError = $"DecryptDeal failed. {ex.Message}";
                 return null;
             }
-
-            // compute shared key and AES526-GCM cipher
-            var dhKey = Suite.G.Point();
-            dhKey.UnmarshalBinary(new MemoryStream(encrypted.DHKey));
-            var pre = DhHelper.DhExchange(LongTermKey, dhKey);
-            var gcm = DhHelper.CreateAEAD(pre, HkdfContext);
-
-            byte[] decrypted = new byte[encrypted.Cipher.Length];
-
-            gcm.Decrypt(encrypted.Nonce, encrypted.Cipher, encrypted.Tag, decrypted);
-
-            var deal = new Deal();
-            deal.UnmarshalBinary(new MemoryStream(decrypted));
-            return deal;
         }
 
         // ProcessEncryptedDeal decrypt the deal received from the Dealer.
@@ -118,35 +127,49 @@ namespace dkg
             try
             {
                 var d = DecryptDeal(e);
+                if (d == null) 
+                    return null;
+
                 if (d.SecShare.I != Index)
                 {
-                    throw new Exception("ProcessEncryptedDeal: got wrong index from deal");
+                    LastProcessingError = "ProcessEncryptedDeal: got wrong index from deal";
+                    return null;
                 }
 
                 var sid = Tools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
-
                 var r = new Response(sid, Index);
 
-                try
-                {
-                    Aggregator.VerifyDeal(d, true);
-                    r.Status = ResponseStatus.Approval;
-                }
-                catch
-                {
-                    r.Status = ResponseStatus.Complaint;
-                }
-
+                r.Complaint = Aggregator.VerifyDeal(d, true);
+                r.Status = r.Complaint == ComplaintCode.NoComplaint ? ResponseStatus.Approval : ResponseStatus.Complaint;
                 r.Signature = Schnorr.Sign(LongTermKey, r.Hash());
-
                 Aggregator.AddResponse(r);
-
                 return r;
             }
             catch (Exception ex)
             {
+                LastProcessingError = $"DecryptDeal failed. {ex.Message}";
                 return null;
             }
+        }
+
+        // Assuming other members of Verifier are defined here...
+
+        // ErrNoDealBeforeResponse is an error returned if a verifier receives a
+        // deal before having received any responses. For the moment, the caller must
+        // be sure to have dispatched a deal before.
+        public static readonly string ErrNoDealBeforeResponse = "verifier: need to receive deal before response";
+
+        // ProcessResponse analyzes the given response. If it's a valid complaint, the
+        // verifier should expect to see a Justification from the Dealer. It returns an
+        // error if it's not a valid response.
+        // Call `v.DealCertified()` to check if the whole protocol is finished.
+        public string? ProcessResponse(Response resp)
+        {
+            if (Aggregator.Deal == null)
+            {
+                return ErrNoDealBeforeResponse;
+            }
+            return Aggregator.VerifyResponse(resp);
         }
 
         // SetTimeout marks the end of the protocol. The caller is expected to call this
@@ -168,6 +191,18 @@ namespace dkg
             }
             return Aggregator.Deal;
         }
-    }
+
+        // ProcessJustification takes a DealerResponse and returns an error if
+        // something went wrong during the verification. If it is the case, that
+        // probably means the Dealer is acting maliciously. In order to be sure, call
+        // `v.DealCertified()`.
+        // Convert the given code to a member function in the Verifier class
+
+        public string? ProcessJustification(Justification justification)
+        {
+            return Aggregator.VerifyJustification(justification);
+        }
+
+}
 
 }

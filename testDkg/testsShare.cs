@@ -147,7 +147,7 @@ namespace ShareTests
         public void TestToString()
         {
             var str = _priShare.ToString();
-            Assert.That(str, Is.EqualTo("{PriShare: I = 5; V = {Secp256k1 Scalar: Value = 1}}"));
+            Assert.That(str, Is.EqualTo("{PriShare: I = 5; V = {Secp256k1 Scalar: 1}}"));
         }
 
         [Test]
@@ -223,8 +223,9 @@ namespace ShareTests
         {
             var str = _pubShare.ToString();
             Assert.That(str, Is.EqualTo("{PubShare: I = 7; V = {Secp256k1 Point: " + 
-                                        "X = 79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798, " + 
-                                        "Y = 483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8}}"));
+                                        "(79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798," + 
+                                        "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8," +
+                                        "1,0)}}"));
         }
         [Test]
         public void TestEquals()

@@ -35,38 +35,65 @@ namespace dkg
         Approval = 1
     }
 
+    public enum ComplaintCode
+    {
+        NoComplaint = 0,
+        AlreadyProcessed = 1,
+        InvalidThreshold = 2,
+        IncompatibeThreshold = 3,
+        SessionIdDoesNotMatch = 4,
+        IndexOutOfBound = 5,
+        ShareDoesNotVerify = 6
+    }
 
     // Response is sent by the verifiers to all participants and holds each
     // individual validation or refusal of a Deal.
-    public class Response
+    public class Response(byte[] sessionId, int index)
     {
+        static private Dictionary<ComplaintCode, string> complaintCodeToMessage = new Dictionary<ComplaintCode, string>()
+        {
+            { ComplaintCode.NoComplaint, "No complaint" },
+            { ComplaintCode.AlreadyProcessed, "Verifier already processed the deal" },
+            { ComplaintCode.InvalidThreshold, "Invalid threshold received" },
+            { ComplaintCode.IncompatibeThreshold, "Incompatible threshold - potential attack" },
+            { ComplaintCode.SessionIdDoesNotMatch, "SessionIds do not match" },
+            { ComplaintCode.IndexOutOfBound, "Index out of bounds" },
+            { ComplaintCode.ShareDoesNotVerify, "Share does not verify against commitments" }
+        };
+
+        static public string GetComplaintMessage(ComplaintCode code)
+        {
+            if (complaintCodeToMessage.TryGetValue(code, out string? complaintMessage))
+            {
+                return complaintMessage;
+            }
+            else
+            {
+                return "Unknown complaint code";
+            }
+        }
+
         // SessionId related to this run of the protocol
-        public byte[] SessionId { get; set; }
+        public byte[] SessionId { get; set; } = sessionId;
 
         // Index of the verifier issuing this Response from the new set of nodes
-        public int Index { get; set; }
+        public int Index { get; set; } = index;
 
         // Complain/Approval
-        public ResponseStatus Status { get; set; }
+        public ResponseStatus Status { get; set; } = ResponseStatus.Complaint;
+        public ComplaintCode Complaint { get; set; } = ComplaintCode.NoComplaint;
 
         // Signature over the whole packet
-        public byte[] Signature { get; set; }
-        public Response(byte[] sessionId, int index)
-        {
-            SessionId = sessionId;
-            Index = index;
-            Signature = [];
-            Status = ResponseStatus.Complaint;
-        }
+        public byte[] Signature { get; set; } = [];
 
         public byte[] Hash()
         {
             MemoryStream b = new();
             BinaryWriter w = new(b);
+            w.Write("response");
             w.Write(SessionId);
             w.Write(Index);
-            w.Write(Status == ResponseStatus.Approval ? true:false);
-            w.Write(Signature);
+            w.Write(Status == ResponseStatus.Approval);
             return Suite.Hash.ComputeHash(b.ToArray());
         }
     }

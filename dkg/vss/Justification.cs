@@ -23,60 +23,32 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
-
 namespace dkg
 {
-    // Class RandomStream implements a view random number generator as a stream
-    public class RandomStream : Stream
+    public class Justification(byte[] sessionId, int index, Deal deal)
     {
-        private RandomNumberGenerator _rng;
+        // SessionId related to the current run of the protocol
+        public byte[] SessionId { get; set; } = sessionId;
 
-        public RandomStream()
+        // Index of the verifier who issued the Complaint,i.e. index of this Deal
+        public int Index { get; set; } = index;
+
+        // Deal in cleartext
+        public Deal Deal { get; set; } = deal;
+
+        // Signature over the whole packet
+        public byte[] Signature { get; set; } = [];
+
+        public byte[] Hash()
         {
-            _rng = RandomNumberGenerator.Create();
-        }
-
-        public override bool CanRead => true;
-
-        public override bool CanSeek => false;
-
-        public override bool CanWrite => false;
-
-        public override long Length => throw new NotSupportedException();
-
-        public override long Position
-        {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
-        }
-
-        public override void Flush()
-        {
-            throw new NotSupportedException();
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var data = new byte[count];
-            _rng.GetBytes(data);
-            Array.Copy(data, 0, buffer, offset, count);
-            return count;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
+            MemoryStream b = new();
+            BinaryWriter w = new(b);
+            w.Write("justification");
+            w.Write(SessionId);
+            w.Write(Index);
+            Deal.MarshalBinary(b);
+            return Suite.Hash.ComputeHash(b.ToArray());
         }
     }
+
 }

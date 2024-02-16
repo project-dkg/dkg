@@ -23,60 +23,50 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
-
 namespace dkg
 {
-    // Class RandomStream implements a view random number generator as a stream
-    public class RandomStream : Stream
+    public static class Tools
     {
-        private RandomNumberGenerator _rng;
-
-        public RandomStream()
+        public static byte[] CreateSessionId(IPoint publicKey, IPoint[] verifiers, IPoint[] commitments, int t)
         {
-            _rng = RandomNumberGenerator.Create();
+            MemoryStream strm = new();
+            publicKey.MarshalBinary(strm);
+            foreach (var vrf in verifiers)
+            {
+                vrf.MarshalBinary(strm);
+            }
+
+            foreach (var cmt in commitments)
+            {
+                cmt.MarshalBinary(strm);
+            }
+            strm.Write(BitConverter.GetBytes((uint)t));
+            return Suite.Hash.ComputeHash(strm.ToArray());
         }
 
-        public override bool CanRead => true;
-
-        public override bool CanSeek => false;
-
-        public override bool CanWrite => false;
-
-        public override long Length => throw new NotSupportedException();
-
-        public override long Position
+        // MinimumT returns a safe value of T that balances secrecy and robustness.
+        // It expects n, the total number of participants.
+        // T should be adjusted to your threat model. Setting a lower T decreases the
+        // difficulty for an adversary to break secrecy. However, a too large T makes
+        // it possible for an adversary to prevent recovery (robustness).
+        public static int MinimumT(int n)
         {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
+            return (n + 1) / 2;
         }
 
-        public override void Flush()
+        public static bool ValidT(int t, IPoint[] verifiers)
         {
-            throw new NotSupportedException();
+            return t >= 2 && t <= verifiers.Length;
         }
 
-        public override int Read(byte[] buffer, int offset, int count)
+        public static IPoint? FindPub(IPoint[] verifiers, int idx)
         {
-            var data = new byte[count];
-            _rng.GetBytes(data);
-            Array.Copy(data, 0, buffer, offset, count);
-            return count;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
+            if (idx >= verifiers.Length || idx < 0)
+            {
+                return null;
+            }
+            return verifiers[idx];
         }
     }
+
 }

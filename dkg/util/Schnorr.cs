@@ -35,8 +35,6 @@
 // when using the edwards25519 group.
 //
 
-using System.Security.Cryptography;
-
 namespace dkg
 {
     public static class Schnorr
@@ -62,7 +60,7 @@ namespace dkg
             return b.ToArray();
         }
 
-        public static string? VerifyWithChecks(IPoint publicKey, byte[] msg, byte[] sig)
+        public static string? Verify(IPoint publicKey, byte[] msg, byte[] sig)
         {
             const string invalidLength = "Schnorr: invalid length";
             const string invalidSignature = "Schnorr: invalid signature";
@@ -106,23 +104,15 @@ namespace dkg
             return null;
         }
 
-        public static string? Verify(IPoint publicPoint, byte[] msg, byte[] sig)
-        {
-            return VerifyWithChecks(publicPoint, msg, sig);
-        }
-
         private static IScalar Hash(IPoint publicPoint, IPoint r, byte[] msg)
         {
-            using (var sha512 = SHA512.Create())
-            {
-                var b = new MemoryStream();
-                r.MarshalBinary(b);
-                publicPoint.MarshalBinary(b);
-                BinaryWriter w = new BinaryWriter(b);
-                w.Write(msg);
-                var hash = sha512.ComputeHash(b.ToArray());
-                return Suite.G.Scalar().SetBytes(hash);
-            }
+            var b = new MemoryStream();
+            r.MarshalBinary(b);
+            publicPoint.MarshalBinary(b);
+            BinaryWriter w = new(b);
+            w.Write(msg);
+            var hash = Suite.Hash.ComputeHash(b.ToArray());
+            return Suite.G.Scalar().SetBytes(hash);
         }
     }
 }

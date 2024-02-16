@@ -24,8 +24,6 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 
-using System.Net.NetworkInformation;
-
 namespace dkg
 {
     // Aggregator is used to collect all deals, and responses for one protocol run.
@@ -64,17 +62,15 @@ namespace dkg
             DealerPublicKey = Suite.G.Point();
         }
 
-        private static readonly Exception ErrDealAlreadyProcessed = new Exception("vss: verifier already received a deal");
+        private static readonly Exception ErrDealAlreadyProcessed = new Exception();
 
         // VerifyDeal analyzes the deal and returns an error if it's incorrect. If 
         // inclusion is true, it also returns an error if it is the second time this struct 
         // analyzes a Deal
-        public Exception? VerifyDeal(Deal d, bool inclusion)
+        public ComplaintCode VerifyDeal(Deal d, bool inclusion)
         {
             if (Deal != null && inclusion)
-            {
-                return ErrDealAlreadyProcessed;
-            }
+                return ComplaintCode.AlreadyProcessed;
 
             if (Deal == null)
             {
@@ -85,51 +81,82 @@ namespace dkg
             }
 
             if (!Tools.ValidT(d.T, Verifiers))
-            {
-                return new Exception("vss: invalid t received in Deal");
-            }
+                return ComplaintCode.InvalidThreshold;
 
             if (d.T != T)
-            {
-                return new Exception("vss: incompatible threshold - potential attack");
-            }
+                return ComplaintCode.IncompatibeThreshold;
 
             if (!SessionId.SequenceEqual(d.SessionId))
-            {
-                return new Exception("vss: find different sessionIDs from Deal");
-            }
+                return ComplaintCode.SessionIdDoesNotMatch;
 
             var fi = d.SecShare;
             if (fi.I < 0 || fi.I >= Verifiers.Length)
-            {
-                return new Exception("vss: index out of bounds in Deal");
-            }
+                return ComplaintCode.IndexOutOfBound;
 
             // Compute fi * G
             var fig = Suite.G.Point().Base().Mul(fi.V);
-
             var commitPoly = new PubPoly(Suite.G, Suite.G.Point().Base(), d.Commitments);
 
             var pubShare = commitPoly.Eval(fi.I);
             if (!fig.Equals(pubShare.V))
-            {
-                return new Exception("vss: share does not verify against commitments in Deal");
-            }
+                return ComplaintCode.ShareDoesNotVerify;
 
-            return null;
+            return ComplaintCode.NoComplaint;
         }
 
-        public Exception? AddResponse(Response r)
+        // ProcessResponse verifies the validity of the given response and stores it
+        // internall. It is  the public version of verifyResponse created this way to
+        // allow higher-level package to use these functionalities.
+
+        public string? ProcessResponse(Response r)
+        {
+            return VerifyResponse(r);
+        }
+
+        public string? VerifyResponse(Response r)
+        {
+            if (SessionId != null && !SessionId.SequenceEqual(r.SessionId))
+                return "VerifyResponse: receiving inconsistent sessionID in response";
+
+            var pub = Tools.FindPub(Verifiers, r.Index);
+            if (pub == null)
+                return "VerifyResponse:: index out of bounds in response";
+
+            var err = Schnorr.Verify(pub, r.Hash(), r.Signature);
+            if (err != null)
+                return err;
+
+            return AddResponse(r);
+        }
+
+        public string? VerifyJustification(Justification j)
+        {
+            if (Tools.FindPub(Verifiers, j.Index) == null)
+                return "VerifyJustification: index out of bounds in justification";
+
+            if (!Responses.TryGetValue(j.Index, out Response? r))
+                return "VerifyJustification: no complaints received for this justification";
+
+            if (r.Status != ResponseStatus.Complaint)
+                return "VerifyJustification: justification received for an approval";
+
+            var Complaint = VerifyDeal(j.Deal, false);
+            if (Complaint != ComplaintCode.NoComplaint)
+            {
+                // if one justification is bad, then flag the dealer as malicious
+                BadDealer = true;
+                return Response.GetComplaintMessage(Complaint);
+            }
+            r.Status = ResponseStatus.Approval;
+            return null;
+        }
+        public string? AddResponse(Response r)
         {
             if (Tools.FindPub(Verifiers, r.Index) ==  null)
-            {
-                return new Exception("vss: index out of bounds in Complaint");
-            }
+                return "AddResponse: index out of bounds in Complaint";
 
             if (Responses.ContainsKey(r.Index))
-            {
-                return new Exception("vss: already existing response from same origin");
-            }
+                return "AddResponse: response from same origin already exists";
 
             Responses[r.Index] = r;
             return null;

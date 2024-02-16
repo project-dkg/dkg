@@ -42,7 +42,7 @@ namespace dkg
         }
         public override string ToString()
         {
-            return $"{{Secp256k1 Scalar: Value = {_value}}}";
+            return $"{{Secp256k1 Scalar: {_value}}}";
         }
         public bool Equals(Secp256k1Scalar? other)
         {
@@ -198,7 +198,7 @@ namespace dkg
         }
         public override string ToString()
         {
-            return $"{{Secp256k1 Point: X = {_point.AffineXCoord}, Y = {_point.AffineYCoord}}}";
+            return $"{{Secp256k1 Point: {_point.ToString()}}}";
         }
         public override int GetHashCode()
         {
