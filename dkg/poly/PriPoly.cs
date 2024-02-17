@@ -32,10 +32,11 @@
 // a verifier can check the claimed evaluations of the committed polynomial.
 
 using System.Runtime.CompilerServices;
+using dkg.group;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
-namespace dkg
+namespace dkg.poly
 {
 
     // PriPoly represents a secret sharing polynomial.

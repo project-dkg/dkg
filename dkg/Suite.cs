@@ -23,43 +23,15 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using System.Security.Cryptography;
 using dkg.group;
 
 namespace dkg
 {
-    public class Config
+    public static class Suite
     {
-        public IGroup G { get; set; }
-
-        // Longterm is the LongTermKey secret key.
-        public IScalar LongTermKey { get; set; }
-
-        // Current group of share holders. It will be null for new DKG.
-        public IPoint[] OldNodes { get; set; }
-
-        // PublicCoeffs are the coefficients of the distributed polynomial needed
-        // during the resharing protocol.
-        public IPoint[] PublicCoeffs { get; set; }
-
-        // Expected new group of share holders.
-        public IPoint[] NewNodes { get; set; }
-
-        // Share to refresh.
-        //public DistKeyShare Share { get; set; }
-
-        // The threshold to use in order to reconstruct the secret with the produced
-        // shares.
-        public int Threshold { get; set; }
-
-        // OldThreshold holds the threshold value that was used in the previous
-        // configuration.
-        public int OldThreshold { get; set; }
-
-        // Reader is an optional field that can hold a user-specified entropy source.
-        public System.IO.Stream Reader { get; set; }
-
-        // When UserReaderOnly it set to true, only the user-specified entropy source
-        // Reader will be used.
-        public bool UserReaderOnly { get; set; }
+        public static readonly IGroup G = new Secp256k1Group();
+        public static readonly HashAlgorithm Hash = SHA256.Create();
     }
+
 }

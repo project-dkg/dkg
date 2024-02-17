@@ -35,6 +35,8 @@
 // when using the edwards25519 group.
 //
 
+using dkg.group;
+
 namespace dkg
 {
     public static class Schnorr

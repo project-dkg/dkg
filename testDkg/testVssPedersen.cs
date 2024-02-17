@@ -23,6 +23,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg.group;
+
 namespace VssTests
 {
     [TestFixture]
@@ -51,14 +53,14 @@ namespace VssTests
             _g = Suite.G;
             (_dealerSec, _dealerPub) = KeyPair();
             (_secret, _) = KeyPair();
-            _vssThreshold = Tools.MinimumT(nbVerifiers);
+            _vssThreshold = VssTools.MinimumT(nbVerifiers);
 
             _verifiersPub = [];
             _verifiersSec = [];
 
             (_verifiersSec, _verifiersPub) = GenCommits(nbVerifiers);
 
-            _goodT = Tools.MinimumT(nbVerifiers);
+            _goodT = VssTools.MinimumT(nbVerifiers);
 
             _randomStream = new();
             _randomReader = new(_randomStream);
@@ -144,7 +146,7 @@ namespace VssTests
             Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Approval));
 
             var aggr = ver.Aggregator;
-            var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
 
             for (int i = 1; i < aggr.T - 1; i++)
             {
@@ -171,7 +173,7 @@ namespace VssTests
             var dealer = GenDealer();
             var aggr = dealer.Aggregator;
 
-            var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
 
             for (int i = 0; i < aggr.T; i++)
             {
@@ -290,7 +292,7 @@ namespace VssTests
             var d = dealer.Deals[randIdx];
 
             IPoint[] commitments = [.. dealer.Deals[0].Commitments];
-            byte[] sid = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.Not.Null);
 
             var encryptedDeal = dealer.EncryptedDeal(randIdx);
@@ -450,7 +452,7 @@ namespace VssTests
             Assert.That(err, Is.Not.Null);
 
             v1.Aggregator.Responses.Remove(v2.Index);
-            var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[v2.Index].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[v2.Index].Commitments], dealer.T);
             v1.Aggregator.Responses[v2.Index] = new Response(sessionId, v2.Index) { Status = ResponseStatus.Approval };
             err = v1.ProcessResponse(resp2);
             Assert.That(err, Is.Not.Null);
@@ -506,14 +508,14 @@ namespace VssTests
 
             for (int i = 0; i < aggr.T; i++)
             {
-                var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
             Assert.That(aggr.DealCertified(), Is.False);
 
             for (int i = aggr.T; i < nbVerifiers; i++)
             {
-                var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
 
@@ -532,7 +534,7 @@ namespace VssTests
 
             for (int i = 0; i < aggr.T; i++)
             {
-                var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
             Assert.That(aggr.DealCertified(), Is.False);
@@ -570,7 +572,7 @@ namespace VssTests
             // Add T responses
             for (int i = 0; i < aggr.T; i++)
             {
-                var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
             Assert.That(aggr.DealCertified(), Is.False);
@@ -646,7 +648,7 @@ namespace VssTests
             var aggr = dealer.Aggregator;
 
             var idx = 1;
-            var sessionId = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[idx].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[idx].Commitments], dealer.T);
             var c = new Response(sessionId, idx) { Status = ResponseStatus.Complaint };
             Assert.Multiple(() =>
             {
@@ -662,14 +664,14 @@ namespace VssTests
         {
             Dealer dealer = GenDealer();
             IPoint[] commitments = [.. dealer.Deals[0].Commitments];
-            byte[] sid = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.Not.Null);
 
-            byte[] sid2 = Tools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid2 = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.EqualTo(sid2));
 
             IPoint wrongDealerPub = _dealerPub.Add(_dealerPub);
-            byte[] sid3 = Tools.CreateSessionId(wrongDealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid3 = VssTools.CreateSessionId(wrongDealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid3, Is.Not.Null);
             Assert.That(sid3, Is.Not.EqualTo(sid2));
         }

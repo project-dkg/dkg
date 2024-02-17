@@ -23,19 +23,11 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using Org.BouncyCastle.Crypto.Digests;
-using Org.BouncyCastle.Crypto.Generators;
+using dkg.group;
+using dkg.poly;
 
-using System.Security.Cryptography;
-
-namespace dkg
+namespace dkg.vss
 {
-    public static class Suite
-    {
-        public static readonly IGroup G = new Secp256k1Group();
-        public static readonly HashAlgorithm Hash = SHA256.Create();
-    }
-
     // Dealer encapsulates for creating and distributing the shares and for
     // replying to any Responses.
     public class Dealer
@@ -60,7 +52,7 @@ namespace dkg
         // returns an error if the t is inferior or equal to 2.
         public Dealer(IScalar longterm, IScalar secret, IPoint[] verifiers, int t)
         {
-            if (!Tools.ValidT(t, verifiers))
+            if (!VssTools.ValidT(t, verifiers))
             {
                 throw new ArgumentException($"Dealer: t {t} invalid");
             }
@@ -77,7 +69,7 @@ namespace dkg
             var F = f.Commit(Suite.G.Point().Base());
             //SecretCommits = [.. F.Commits];
 
-            SessionId = Tools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
+            SessionId = VssTools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
 
             Aggregator = new Aggregator(PublicKey, Verifiers, F.Commits, T, SessionId);
             // C = F + G
@@ -106,7 +98,7 @@ namespace dkg
         // verifier at index i.
         public EncryptedDeal EncryptedDeal(int i)
         {
-            IPoint vPub = Tools.FindPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range"); 
+            IPoint vPub = VssTools.FindPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range");
             // gen ephemeral key
             var dhSecret = Suite.G.Scalar();
             var dhPublic = Suite.G.Point().Base().Mul(dhSecret);
@@ -175,6 +167,6 @@ namespace dkg
             j.Signature = Schnorr.Sign(LongTermKey, j.Hash());
             return j;
         }
-        
+
     }
 }

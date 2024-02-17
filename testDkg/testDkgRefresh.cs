@@ -23,6 +23,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg.group;
+
 namespace DkgTests
 {
     [TestFixture]
@@ -170,7 +172,8 @@ namespace DkgTests
             var refreshedPriPoly = PriPoly.RecoverPriPoly(g, newDKGShares, t, n);
 
             // Check that the secret and the corresponding (old) public commit match
-            Assert.That(dkgCommits[0], Is.EqualTo(g.Point().Base().Mul(refreshedPriPoly!.Secret())));
+            Assert.That(refreshedPriPoly, Is.Not.Null);
+            Assert.That(dkgCommits[0], Is.EqualTo(g.Point().Base().Mul(refreshedPriPoly.Secret())));
         }
     }
 }

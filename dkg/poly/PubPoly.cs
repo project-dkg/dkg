@@ -32,10 +32,11 @@
 // a verifier can check the claimed evaluations of the committed polynomial.
 
 using System.Runtime.CompilerServices;
+using dkg.group;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
-namespace dkg
+namespace dkg.poly
 {
 
     // PubPoly represents a public commitment polynomial to a secret sharing polynomial.

@@ -23,8 +23,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg.group;
+using dkg.poly;
 
-namespace dkg
+namespace dkg.vss
 {
     // Aggregator is used to collect all deals, and responses for one protocol run.
     // It brings common functionalities for both Dealer and Verifier structs.
@@ -80,7 +82,7 @@ namespace dkg
                 T = d.T;
             }
 
-            if (!Tools.ValidT(d.T, Verifiers))
+            if (!VssTools.ValidT(d.T, Verifiers))
                 return ComplaintCode.InvalidThreshold;
 
             if (d.T != T)
@@ -118,7 +120,7 @@ namespace dkg
             if (SessionId != null && !SessionId.SequenceEqual(r.SessionId))
                 return "VerifyResponse: receiving inconsistent sessionID in response";
 
-            var pub = Tools.FindPub(Verifiers, r.Index);
+            var pub = VssTools.FindPub(Verifiers, r.Index);
             if (pub == null)
                 return "VerifyResponse:: index out of bounds in response";
 
@@ -131,7 +133,7 @@ namespace dkg
 
         public string? VerifyJustification(Justification j)
         {
-            if (Tools.FindPub(Verifiers, j.Index) == null)
+            if (VssTools.FindPub(Verifiers, j.Index) == null)
                 return "VerifyJustification: index out of bounds in justification";
 
             if (!Responses.TryGetValue(j.Index, out Response? r))
@@ -152,7 +154,7 @@ namespace dkg
         }
         public string? AddResponse(Response r)
         {
-            if (Tools.FindPub(Verifiers, r.Index) ==  null)
+            if (VssTools.FindPub(Verifiers, r.Index) ==  null)
                 return "AddResponse: index out of bounds in Complaint";
 
             if (Responses.ContainsKey(r.Index))

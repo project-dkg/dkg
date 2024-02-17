@@ -33,10 +33,11 @@
 
 using System.Security.Cryptography;
 using System.Runtime.CompilerServices;
+using dkg.group;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
-namespace dkg
+namespace dkg.poly
 {
     public class Share(int I) : IMarshalling, IEquatable<Share>
     {

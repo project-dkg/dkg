@@ -24,6 +24,8 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 
+using dkg.group;
+
 namespace SchnorrTests
 {
     [TestFixture]

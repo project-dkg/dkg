@@ -24,7 +24,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-namespace dkg
+using dkg.group;
+using dkg.poly;
+
+namespace dkg.vss
 {
     // Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
     public class Deal : IMarshalling, IEquatable<Deal>

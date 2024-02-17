@@ -24,10 +24,11 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 using System.Runtime.CompilerServices;
+using dkg.group;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
-namespace dkg
+namespace dkg.vss
 {
     // Verifier receives a Deal from a Dealer, can reply with a Complaint, and can
     // collaborate with other Verifiers to reconstruct a secret.
@@ -136,7 +137,7 @@ namespace dkg
                     return null;
                 }
 
-                var sid = Tools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
+                var sid = VssTools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
                 var r = new Response(sid, Index);
 
                 r.Complaint = Aggregator.VerifyDeal(d, true);

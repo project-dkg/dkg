@@ -23,9 +23,11 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-namespace dkg
+using dkg.group;
+
+namespace dkg.vss
 {
-    public static class Tools
+    public static class VssTools
     {
         public static byte[] CreateSessionId(IPoint publicKey, IPoint[] verifiers, IPoint[] commitments, int t)
         {
