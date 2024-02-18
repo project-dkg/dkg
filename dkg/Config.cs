@@ -52,7 +52,7 @@ namespace dkg
         public IPoint[] NewNodes { get; set; }
 
         // Share to refresh.
-        public DistKeyShare Share { get; set; }
+        public DistKeyShare? Share { get; set; }
 
         // The threshold to use in order to reconstruct the secret with the produced
         // shares.
@@ -63,10 +63,20 @@ namespace dkg
         public int OldThreshold { get; set; }
 
         // Reader is an optional field that can hold a user-specified entropy source.
-        public System.IO.Stream Reader { get; set; }
+        //public System.IO.Stream Reader { get; set; }
 
         // When UserReaderOnly it set to true, only the user-specified entropy source
         // Reader will be used.
-        public bool UserReaderOnly { get; set; }
+        //public bool UserReaderOnly { get; set; }
+
+        public Config(IScalar longterm, IPoint[] newNodes, int threshold)
+        {
+            LongTermKey = longterm;
+            NewNodes = newNodes;
+            Threshold = threshold;
+
+            OldNodes = [];
+            PublicCoeffs = [];
+        }
     }
 }

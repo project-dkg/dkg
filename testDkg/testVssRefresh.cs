@@ -23,12 +23,12 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-namespace DkgTests
+namespace VssTests
 {
-    internal class DkgRefreshTests
+    internal class VssRefreshTest
     {
         [Test]
-        public void TestRefreshDKG()
+        public void TestVssRefresh()
         {
             var g = new Secp256k1Group();
             int n = 10;

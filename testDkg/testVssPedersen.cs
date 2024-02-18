@@ -23,9 +23,12 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg;
+using System.Net.Sockets;
+
 namespace VssTests
 {
-    internal class DkgTests
+    internal class VssTests
     {
         private const int nbVerifiers = 7;
 
@@ -102,7 +105,64 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssDealerNew()
+        public void TestWhole()
+        {
+            var (dealer, verifiers) = GenAll();
+
+            // 1. dispatch deal
+            var resps = new Response[nbVerifiers];
+            var encDeals = dealer.EncryptedDeals();  // No Exception
+
+            for (var i = 0; i < encDeals.Length; i++)
+            {
+                var d = encDeals[i];
+                var resp = verifiers[i].ProcessEncryptedDeal(d); // No exception
+                Assert.That(resp, Is.Not.Null); 
+                resps[i] = resp;
+            }
+
+            // 2. dispatch responses
+            foreach (var resp in resps)
+            {
+                for (var i = 0; i < verifiers.Count; i++)
+                {
+                    var v = verifiers[i];
+                    if (resp.Index == (uint)i)
+                        continue;
+                    Assert.That(v.ProcessResponse(resp), Is.Null);
+                }
+                // 2.1. check dealer (no justification here)
+                var j = dealer.ProcessResponse(resp);  // No exception
+                Assert.That(j, Is.Null); 
+            }
+
+            // 3. check certified
+            foreach (var v in verifiers)
+            {
+                Assert.That(v.DealCertified(), Is.True);
+            }
+
+            // 4. collect deals
+            Deal[] deals = new Deal[nbVerifiers];
+            for (var i = 0; i < verifiers.Count; i++)
+            {
+                var dd = verifiers[i].Deal();
+                Assert.That(dd, Is.Not.Null);
+                deals[i] = dd;
+            }
+
+            // 5. recover
+            var sec = Dealer.RecoverSecret(deals, nbVerifiers, VssTools.MinimumT(nbVerifiers));
+            Assert.That(sec, Is.Not.Null);
+            Assert.That(sec, Is.EqualTo(_secret));
+
+            var priPoly = dealer.SecretPoly;
+            var priCoeffs = priPoly.Coeffs;
+            Assert.That(_secret, Is.EqualTo(priCoeffs[0]));
+        }
+
+        [Test]
+        public void TestDealerNew()
         {
             Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], _goodT);
 
@@ -117,7 +177,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssVerifierNew()
+        public void TestVerifierNew()
         {
             Random Random = new();
             int randIdx = Random.Next(_verifiersPub.Count);
@@ -126,13 +186,13 @@ namespace VssTests
             IScalar wrongKey = _g.Scalar();
             Assert.Throws<ArgumentException>(() =>
             {
-                Verifier wrongVerifier = new Verifier(wrongKey, _dealerPub, [.. _verifiersPub]);
+                Verifier wrongVerifier = new(wrongKey, _dealerPub, [.. _verifiersPub]);
             });
         }
 
 
         [Test]
-        public void TestVssShare()
+        public void TestShare()
         {
             var (dealer, verifiers) = GenAll();
             var ver = verifiers[0];
@@ -165,7 +225,7 @@ namespace VssTests
             Assert.That(ver.GetDeal(), Is.Not.Null);
         }
         [Test]
-        public void TestVssAggregatorDealCertified()
+        public void TestAggregatorDealCertified()
         {
             var dealer = GenDealer();
             var aggr = dealer.Aggregator;
@@ -208,7 +268,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssDecryptDeal()
+        public void TestDecryptDeal()
         {
             var (dealer, verifiers) = GenAll();
 
@@ -278,7 +338,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssReceiveDeal()
+        public void TestReceiveDeal()
         {
             var (dealer, verifiers) = GenAll();
 
@@ -372,7 +432,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssAggregatorVerifyJustification()
+        public void TestAggregatorVerifyJustification()
         {
             var (dealer, verifiers) = GenAll();
             var verifier = verifiers[0];
@@ -416,7 +476,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssAggregatorVerifyResponseDuplicate()
+        public void TestAggregatorVerifyResponseDuplicate()
         {
             var (dealer, verifiers) = GenAll();
             var v1 = verifiers[0];
@@ -456,7 +516,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssAggregatorVerifyResponse()
+        public void TestAggregatorVerifyResponse()
         {
             var (dealer, verifiers) = GenAll();
             var v = verifiers[0];
@@ -498,7 +558,7 @@ namespace VssTests
             resp.SessionId = goodID;
         }
         [Test]
-        public void TestVssAggregatorAllResponses()
+        public void TestAggregatorAllResponses()
         {
             var dealer = GenDealer();
             var aggr = dealer.Aggregator;
@@ -524,7 +584,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssDealerTimeout()
+        public void TestDealerTimeout()
         {
             var dealer = GenDealer();
             var aggr = dealer.Aggregator;
@@ -548,7 +608,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssVerifierTimeout()
+        public void TestVerifierTimeout()
         {
             var (dealer, verifiers) = GenAll();
             var v = verifiers[0];
@@ -587,7 +647,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssAggregatorVerifyDeal()
+        public void TestAggregatorVerifyDeal()
         {
             var dealer = GenDealer();
             var aggr = dealer.Aggregator;
@@ -639,7 +699,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssAggregatorAddComplaint()
+        public void TestAggregatorAddComplaint()
         {
             var dealer = GenDealer();
             var aggr = dealer.Aggregator;
@@ -657,7 +717,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssSessionId()
+        public void TestSessionId()
         {
             Dealer dealer = GenDealer();
             IPoint[] commitments = [.. dealer.Deals[0].Commitments];
@@ -674,7 +734,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssDhExchange()
+        public void TestDhExchange()
         {
             IPoint pub = _g.Point().Base();
             IScalar priv = _g.Scalar();
@@ -683,14 +743,14 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVssContext()
+        public void TestContext()
         {
             byte[] context = DhHelper.Context(Suite.Hash, _dealerPub, [.. _verifiersPub]);
             Assert.That(context, Has.Length.EqualTo(Suite.Hash.HashSize / 8));
         }
 
         [Test]
-        public void TestVssDealEquals()
+        public void TestDealEquals()
         {
             Dealer dealer = GenDealer();
             Deal d = new();
@@ -706,7 +766,7 @@ namespace VssTests
         }
 
         [Test]
-        public void TestVSSDealMarshaUnmarshal()
+        public void TestDealMarshaUnmarshal()
         {
             Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], _goodT);
             Deal d = new();

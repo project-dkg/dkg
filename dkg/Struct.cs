@@ -90,7 +90,6 @@ namespace dkg
             BinaryWriter bw = new(s);
             bw.Write(Index);
             VssDeal.MarshalBinary(s);
-            bw.Write(Signature);
         }
     }
 

@@ -217,7 +217,7 @@ namespace dkg.poly
 
         // RecoverSecret reconstructs the shared secret p(0) from a list of private
         // shares using Lagrange interpolation.
-        public static IScalar RecoverSecret(Secp256k1Group g, PriShare[] shares, int t, int n)
+        public static IScalar RecoverSecret(IGroup g, PriShare[] shares, int t, int n)
         {
             var (x, y) = XyScalar(g, shares, t, n);
 

@@ -23,8 +23,11 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg;
 using dkg.group;
 using dkg.poly;
+using Org.BouncyCastle.Utilities;
+using System;
 
 namespace dkg.vss
 {
@@ -104,7 +107,7 @@ namespace dkg.vss
             var dhPublic = Suite.G.Point().Base().Mul(dhSecret);
             // signs the public key
             var dhPublicBuff = dhPublic.GetBytes();
-            var signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
+            var signature = Schnorr.Sign(Suite.G, Suite.Hash, LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
 
             // AES128-GCM
             var pre = DhHelper.DhExchange(dhSecret, vPub);
@@ -167,6 +170,25 @@ namespace dkg.vss
             j.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, j.Hash());
             return j;
         }
-
+        // RecoverSecret recovers the secret shared by a Dealer by gathering at least t
+        // Deals from the verifiers. It returns an error if there is not enough Deals or
+        // if all Deals don't have the same SessionID.
+        public static IScalar RecoverSecret(Deal[] deals, int n, int t)
+        {
+            PriShare[] shares = new PriShare[deals.Length];
+            for (int i = 0; i < deals.Length; i++)
+            {
+                // all sids the same
+                if (deals[i].SessionId.SequenceEqual(deals[0].SessionId))
+                {
+                    shares[i] = deals[i].SecShare;
+                }
+                else
+                {
+                    throw new DkgError("All deals need to have same session id", "RecoverSecret");
+                }
+            }
+            return PriPoly.RecoverSecret(Suite.G, shares, t, n);
+        }
     }
 }

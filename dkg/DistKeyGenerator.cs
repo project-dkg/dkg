@@ -1,13 +1,6 @@
 ﻿using dkg.group;
 using dkg.poly;
 using dkg.vss;
-using System.Drawing;
-using System;
-using Org.BouncyCastle.Pqc.Crypto.Lms;
-using System.ComponentModel;
-using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Linq;
 
 namespace dkg
 {
@@ -56,14 +49,14 @@ namespace dkg
         public DistKeyGenerator(Config c)
         {
             // Check if both new and old nodes list are empty
-            if (c.NewNodes.Length == 0 && c.OldNodes.Length == 0)
+            if (c.NewNodes.Length == 0 &&  c.OldNodes.Length == 0)
             {
                 throw new DkgError("Can't run with empty node list", GetType().Name);
             }
 
             bool isResharing = false;
             // Check if resharing is required
-            if (c.Share != null || c.PublicCoeffs != null)
+            if (c.Share != null || c.PublicCoeffs.Length != 0)
             {
                 isResharing = true;
             }
@@ -184,12 +177,7 @@ namespace dkg
         // distributed key with the regular DKG protocol.
         public static DistKeyGenerator CreateDistKeyGenerator(IScalar longterm, IPoint[] participants, int t)
         {
-            var c = new Config
-            {
-                LongTermKey = longterm,
-                NewNodes = participants,
-                Threshold = t
-            };
+            var c = new Config(longterm, participants, t);
             return new DistKeyGenerator(c);
         }
 
@@ -292,32 +280,18 @@ namespace dkg
         public DistResponse ProcessDeal(DistDeal dd)
         {
             if (!NewPresent)
-            {
-                throw new DkgError("dkg: unexpected deal for unlisted dealer in new list", GetType().Name);
-            }
+                throw new DkgError("dkg: unexpected deal for unlisted dealer in a new list", GetType().Name);
 
-            IPoint? pub;
-            if (IsResharing)
-            {
-                pub = VssTools.GetPub(C.OldNodes, dd.Index);
-            }
-            else
-            {
-                pub = VssTools.GetPub(C.NewNodes, dd.Index);
-            }
-
-            // public key of the dealer
-            if (pub == null)
-            {
-                throw new DkgError("dkg: dist deal out of bounds index", GetType().Name);
-            }
+            IPoint? pub = (IsResharing ? VssTools.GetPub(C.OldNodes, dd.Index) :
+                                         VssTools.GetPub(C.NewNodes, dd.Index)) ?? 
+                                         throw new DkgError("dkg: dist deal out of bounds index", GetType().Name);
 
             // verify signature
             byte[] buff;
             try
             {
                 buff = dd.GetBytes();
-                Schnorr.Verify(Suite.G, Suite.Hash, Pub, buff, dd.Signature);
+                Schnorr.Verify(Suite.G, Suite.Hash, pub, buff, dd.Signature);//!!!
             }
             catch (Exception e)
             {
@@ -326,9 +300,7 @@ namespace dkg
 
             Verifiers.TryGetValue(dd.Index, out Verifier? ver);
             if (ver == null)
-            {
                 throw new DkgError("missing verifiers", GetType().Name);
-            }
 
             Response? resp;
             try
@@ -387,9 +359,7 @@ namespace dkg
             // don't add it manually there.
             int newIdx = VssTools.FindPubIdx(C.NewNodes, pub);
             if (newIdx != -1 && !IsResharing)
-            {
                 Verifiers[dd.Index].SetResponseDkg(newIdx, ResponseStatus.Approval);
-            }
 
             return new DistResponse(dd.Index, resp);
         }
@@ -402,15 +372,11 @@ namespace dkg
         public DistJustification? ProcessResponse(DistResponse resp)
         {
             if (IsResharing && CanIssue && !NewPresent)
-            {
-                return ProcessResharingResponse(resp);
-            }
+                 return ProcessResharingResponse(resp);
 
-            bool ok = Verifiers.TryGetValue(resp.Index, out Verifier? v);
-            if (!ok)
-            {
+            Verifiers.TryGetValue(resp.Index, out Verifier? v);
+            if (v == null)
                 throw new DkgError($"dkg: responses received for unknown dealer {resp.Index}", GetType().Name);
-            }
 
             try
             {
@@ -423,10 +389,8 @@ namespace dkg
 
             int myIdx = Oidx;
             if (!CanIssue || resp.Index != myIdx)
-            {
                 // no justification if we dont issue deals or the deal's not from us
                 return null;
-            }
 
             Justification? j;
             try
@@ -439,9 +403,7 @@ namespace dkg
             }
 
             if (j == null)
-            {
                 return null;
-            }
 
             try
             {
@@ -460,8 +422,8 @@ namespace dkg
         // returns a justification if the response is invalid.
         public DistJustification? ProcessResharingResponse(DistResponse resp)
         {
-            bool present = OldAggregators.TryGetValue(resp.Index, out Aggregator? agg);
-            if (!present)
+            OldAggregators.TryGetValue(resp.Index, out Aggregator? agg);
+            if (agg == null)
             {
                 agg = new Aggregator(C.NewNodes);
                 OldAggregators[resp.Index] = agg;
@@ -477,14 +439,10 @@ namespace dkg
             }
 
             if (resp.Index != Oidx)
-            {
                 return null;
-            }
 
             if (resp.VssResponse.Status == ResponseStatus.Approval)
-            {
                 return null;
-            }
 
             // status is complaint and it is about our deal
             Deal deal;
@@ -511,9 +469,7 @@ namespace dkg
         {
             Verifiers.TryGetValue(j.Index, out Verifier? v);
             if (v == null)
-            {
                 throw new DkgError("Justification received but there is no deal for it.", GetType().Name);
-            }
 
             try
             {
@@ -796,7 +752,9 @@ namespace dkg
 
             // the private polynomial is generated from the old nodes, thus inheriting
             // the old threshold condition
-            var priPoly = PriPoly.RecoverPriPoly(Suite.G, shares, OldT, C.OldNodes.Length);
+            var priPoly = PriPoly.RecoverPriPoly(Suite.G, shares, OldT, C.OldNodes.Length) ??
+                          throw new DkgError("Could not recover PriPoly", GetType().Name);
+             
             var privateShare = new PriShare(Nidx, priPoly.Secret());
 
             // recover public polynomial by interpolating coefficient-wise all
