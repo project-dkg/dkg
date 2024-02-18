@@ -5,7 +5,7 @@ using dkg.vss;
 namespace dkg
 {
     // DistKeyShare holds the share of a distributed key for a participant.
-    public class DistKeyShare(IPoint[] commits, PriShare share, IScalar[] privatePoly)
+    public class DistKeyShare(IPoint[] commits, PriShare share, IScalar[] privatePoly) : IEquatable<DistKeyShare>
     {
         // Coefficients of the public polynomial holding the public key.
         public IPoint[] Commits { get; set; } = commits;
@@ -60,6 +60,48 @@ namespace dkg
                 newCommits[i] = Commits[i].Add(g.Commits[i]);
             }
             return new DistKeyShare(newCommits, new PriShare(Share.I, newShare), PrivatePoly);
+        }
+
+        public bool Equals(DistKeyShare? other)
+        {
+            if (other == null)
+                return false;
+
+            if (ReferenceEquals(this, other))
+                return true;
+
+            if (Commits.Length != other.Commits.Length)
+                return false;
+
+            for (int i = 0; i < Commits.Length; i++)
+            {
+                if (!Commits[i].Equals(other.Commits[i]))
+                    return false;
+            }
+            return true;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return Equals(obj as DistKeyShare);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked // Overflow is fine, just wrap
+            {
+                int hash = 17;
+                foreach (var coeff in PrivatePoly)
+                {
+                    hash = hash * 23 + (coeff != null ? coeff.GetHashCode() : 0);
+                }
+                foreach (var commit in Commits)
+                {
+                    hash = hash * 23 + (commit != null ? commit.GetHashCode() : 0);
+                }
+                hash = hash * 23 + (Share != null ? Share.GetHashCode() : 0);
+                return hash;
+            }
         }
     }
 

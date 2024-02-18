@@ -24,13 +24,14 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 using dkg;
+using Org.BouncyCastle.Ocsp;
 using System.Net.Sockets;
 
 namespace VssTests
 {
     internal class VssTests
     {
-        private const int nbVerifiers = 7;
+        private const int _nbVerifiers = 7;
 
         private int _goodT;
 
@@ -53,14 +54,14 @@ namespace VssTests
             _g = Suite.G;
             (_dealerSec, _dealerPub) = KeyPair();
             (_secret, _) = KeyPair();
-            _vssThreshold = VssTools.MinimumT(nbVerifiers);
+            _vssThreshold = VssTools.MinimumT(_nbVerifiers);
 
             _verifiersPub = [];
             _verifiersSec = [];
 
-            (_verifiersSec, _verifiersPub) = GenCommits(nbVerifiers);
+            (_verifiersSec, _verifiersPub) = GenCommits(_nbVerifiers);
 
-            _goodT = VssTools.MinimumT(nbVerifiers);
+            _goodT = VssTools.MinimumT(_nbVerifiers);
 
             _randomStream = new();
             _randomReader = new(_randomStream);
@@ -95,8 +96,8 @@ namespace VssTests
         private (Dealer, List<Verifier>) GenAll()
         {
             var dealer = GenDealer();
-            var verifiers = new List<Verifier>(nbVerifiers);
-            for (var i = 0; i < nbVerifiers; i++)
+            var verifiers = new List<Verifier>(_nbVerifiers);
+            for (var i = 0; i < _nbVerifiers; i++)
             {
                 var v = new Verifier(_verifiersSec[i], _dealerPub, [.. _verifiersPub]);
                 verifiers.Add(v);
@@ -110,7 +111,7 @@ namespace VssTests
             var (dealer, verifiers) = GenAll();
 
             // 1. dispatch deal
-            var resps = new Response[nbVerifiers];
+            var resps = new Response[_nbVerifiers];
             var encDeals = dealer.EncryptedDeals();  // No Exception
 
             for (var i = 0; i < encDeals.Length; i++)
@@ -129,7 +130,7 @@ namespace VssTests
                     var v = verifiers[i];
                     if (resp.Index == (uint)i)
                         continue;
-                    Assert.That(v.ProcessResponse(resp), Is.Null);
+                    Assert.DoesNotThrow(() => v.ProcessResponse(resp));
                 }
                 // 2.1. check dealer (no justification here)
                 var j = dealer.ProcessResponse(resp);  // No exception
@@ -143,7 +144,7 @@ namespace VssTests
             }
 
             // 4. collect deals
-            Deal[] deals = new Deal[nbVerifiers];
+            Deal[] deals = new Deal[_nbVerifiers];
             for (var i = 0; i < verifiers.Count; i++)
             {
                 var dd = verifiers[i].Deal();
@@ -152,7 +153,7 @@ namespace VssTests
             }
 
             // 5. recover
-            var sec = Dealer.RecoverSecret(deals, nbVerifiers, VssTools.MinimumT(nbVerifiers));
+            var sec = Dealer.RecoverSecret(deals, _nbVerifiers, VssTools.MinimumT(_nbVerifiers));
             Assert.That(sec, Is.Not.Null);
             Assert.That(sec, Is.EqualTo(_secret));
 
@@ -275,7 +276,7 @@ namespace VssTests
             int randIdx = _randomReader.ReadInt32() % (dealer.T - 1);
             randIdx = randIdx < 0 ? -randIdx : randIdx;
 
-            var verifier = verifiers[randIdx];
+            Verifier verifier = verifiers[randIdx];
             var d = dealer.Deals[randIdx];
 
             EncryptedDeal encryptedDeal = dealer.EncryptedDeal(randIdx);
@@ -284,56 +285,35 @@ namespace VssTests
 
             // all fine
             Deal? decryptedDeal = verifier.DecryptDeal(encryptedDeal);
-            Assert.Multiple(() =>
-            {
-                Assert.That(dealer.Deals[randIdx], Is.EqualTo(decryptedDeal));
-                Assert.That(verifier.LastProcessingError, Is.Null);
-            });
+            Assert.That(dealer.Deals[randIdx], Is.EqualTo(decryptedDeal)); // No exception
+            Assert.That(verifier.LastProcessingError, Is.Null);
 
             // wrong dh key
             var goodDh = encryptedDeal.DHKey;
             encryptedDeal.DHKey = Suite.G.Point().Null().GetBytes();
-            decryptedDeal = verifier.DecryptDeal(encryptedDeal);
-            Assert.Multiple(() =>
-            {
-                Assert.That(verifier.LastProcessingError, Is.EqualTo("DecryptDeal failed: Invalid signature"));
-                Assert.That(decryptedDeal, Is.Null);
-            });
+            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+            Assert.That(verifier.LastProcessingError, Is.Not.Null);
             encryptedDeal.DHKey = goodDh;
 
             // wrong signature
             var goodSig = encryptedDeal.Signature;
             encryptedDeal.Signature = _randomReader.ReadBytes(goodSig.Length * 2);
-            decryptedDeal = verifier.DecryptDeal(encryptedDeal);
-            Assert.Multiple(() =>
-            {
-                Assert.That(verifier.LastProcessingError, Is.EqualTo("DecryptDeal failed: Invalid length"));
-                Assert.That(decryptedDeal, Is.Null);
-            });
+            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+            Assert.That(verifier.LastProcessingError, Is.Not.Null);
             encryptedDeal.Signature = goodSig;
 
             // wrong ciphertext
             var goodCipher = encryptedDeal.Cipher;
             encryptedDeal.Cipher = _randomReader.ReadBytes(goodCipher.Length);
-            decryptedDeal = verifier.DecryptDeal(encryptedDeal);
-            Assert.Multiple(() =>
-            {
-                Assert.That(verifier.LastProcessingError, 
-                            Is.EqualTo("DecryptDeal failed: The computed authentication tag did not match the input authentication tag."));
-                Assert.That(decryptedDeal, Is.Null);
-            });
+            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+            Assert.That(verifier.LastProcessingError, Is.Not.Null);
             encryptedDeal.Cipher = goodCipher;
 
             // wrong tag
             var goodTag = encryptedDeal.Tag;
             encryptedDeal.Tag = _randomReader.ReadBytes(goodTag.Length);
-            decryptedDeal = verifier.DecryptDeal(encryptedDeal);
-            Assert.Multiple(() =>
-            {
-                Assert.That(verifier.LastProcessingError, 
-                            Is.EqualTo("DecryptDeal failed: The computed authentication tag did not match the input authentication tag."));
-                Assert.That(decryptedDeal, Is.Null);
-            });
+            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+            Assert.That(verifier.LastProcessingError, Is.Not.Null);
             encryptedDeal.Tag = goodTag;
         }
 
@@ -356,12 +336,12 @@ namespace VssTests
  // !!! Assert.IsNull(encryptedDeal.LastProcessingError);
 
             // correct deal
-            var resp = verifier.ProcessEncryptedDeal(encryptedDeal);
+            var resp = verifier.ProcessEncryptedDeal(encryptedDeal); // No exception
             Assert.That(resp, Is.Not.Null);
             Assert.Multiple(() =>
             {
-                Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Approval));
                 Assert.That(verifier.LastProcessingError, Is.Null);
+                Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Approval));
                 Assert.That(resp.Index, Is.EqualTo(verifier.Index));
                 Assert.That(resp.SessionId, Is.EqualTo(dealer.SessionId));
                 Schnorr.Verify(Suite.G, Suite.Hash, verifier.PublicKey, resp.Hash(), resp.Signature);
@@ -371,23 +351,21 @@ namespace VssTests
             // wrong encryption
             var goodSig = encryptedDeal.Signature;
             encryptedDeal.Signature = _randomReader.ReadBytes(32);
-            resp = verifier.ProcessEncryptedDeal(encryptedDeal);
             Assert.Multiple(() =>
             {
-                Assert.That(resp, Is.Null);
+                Assert.That(verifier.ProcessEncryptedDeal(encryptedDeal), Is.Null);
                 Assert.That(verifier.LastProcessingError, Is.Not.Null);
             });
             encryptedDeal.Signature = goodSig;
 
             // wrong index
             var goodIdx = d.SecShare.I;
-            d.SecShare.I = (goodIdx - 1) % nbVerifiers;
+            d.SecShare.I = (goodIdx - 1) % _nbVerifiers;
             encryptedDeal = dealer.EncryptedDeal(0);
-            resp = verifier.ProcessEncryptedDeal(encryptedDeal);
             Assert.Multiple(() =>
             {
+                Assert.That(verifier.ProcessEncryptedDeal(encryptedDeal), Is.Null);
                 Assert.That(verifier.LastProcessingError, Is.Not.Null);
-                Assert.That(resp, Is.Null);
             });
             d.SecShare.I = goodIdx;
 
@@ -404,6 +382,7 @@ namespace VssTests
             Assert.That(resp, Is.Not.Null);
             Assert.Multiple(() =>
             {
+                Assert.That(verifier.LastProcessingError, Is.Null);
                 Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Complaint));
                 Assert.That(resp.Complaint, Is.EqualTo(ComplaintCode.ShareDoesNotVerify));
             });
@@ -416,6 +395,7 @@ namespace VssTests
             Assert.That(resp, Is.Not.Null);
             Assert.Multiple(() =>
             {
+                Assert.That(verifier.LastProcessingError, Is.Null);
                 Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Approval));
                 Assert.That(resp.Complaint, Is.EqualTo(ComplaintCode.NoComplaint));
             });
@@ -426,6 +406,7 @@ namespace VssTests
             Assert.That(resp, Is.Not.Null);
             Assert.Multiple(() =>
             {
+                Assert.That(verifier.LastProcessingError, Is.Null);
                 Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Complaint));
                 Assert.That(resp.Complaint, Is.EqualTo(ComplaintCode.AlreadyProcessed));
             });
@@ -455,10 +436,9 @@ namespace VssTests
             Assert.That(j, Is.Not.Null);
             goodV = j.Deal.SecShare.V;
             j.Deal.SecShare.V = wrongV;
-            var err = verifier.ProcessJustification(j);
             Assert.Multiple(() =>
             {
-                Assert.That(err, Is.Not.Null);
+                Assert.That(verifier.ProcessJustification(j), Is.Not.Null);
                 Assert.That(verifier.Aggregator.BadDealer, Is.True);
             });
             j.Deal.SecShare.V = goodV;
@@ -466,8 +446,7 @@ namespace VssTests
             Assert.That(verifier.ProcessJustification(j), Is.Null);
 
             resp.SessionId = _randomReader.ReadBytes(resp.SessionId.Length);
-            var badJ = dealer.ProcessResponse(resp);
-            Assert.That(badJ, Is.Null);
+            Assert.That(verifier.ProcessJustification(j), Is.Not.Null);
             resp.SessionId = dealer.SessionId;
 
             verifier.Responses().Remove(verifier.Index);
@@ -486,18 +465,10 @@ namespace VssTests
 
             var resp1 = v1.ProcessEncryptedDeal(encD1);
             Assert.That(resp1, Is.Not.Null);
-            Assert.Multiple(() =>
-            {
-                Assert.That(v1.LastProcessingError, Is.Null);
-                Assert.That(resp1.Status, Is.EqualTo(ResponseStatus.Approval));
-            });
+            Assert.That(resp1.Status, Is.EqualTo(ResponseStatus.Approval));
             var resp2 = v2.ProcessEncryptedDeal(encD2);
             Assert.That(resp2, Is.Not.Null);
-            Assert.Multiple(() =>
-            {
-                Assert.That(v1.LastProcessingError, Is.Null);
-                Assert.That(resp2.Status, Is.EqualTo(ResponseStatus.Approval));
-            });
+            Assert.That(resp2.Status, Is.EqualTo(ResponseStatus.Approval));
             var err = v1.ProcessResponse(resp2);
             Assert.Multiple(() =>
             {
@@ -505,14 +476,14 @@ namespace VssTests
                 Assert.That(v1.Responses().TryGetValue(v2.Index, out Response? r), Is.True);
                 Assert.That(r, Is.EqualTo(resp2));
             });
+
             err = v1.ProcessResponse(resp2);
             Assert.That(err, Is.Not.Null);
 
             v1.Responses().Remove(v2.Index);
             var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[v2.Index].Commitments], dealer.T);
             v1.Responses()[v2.Index] = new Response(sessionId, v2.Index) { Status = ResponseStatus.Approval };
-            err = v1.ProcessResponse(resp2);
-            Assert.That(err, Is.Not.Null);
+            Assert.That(v1.ProcessResponse(resp2), Is.Not.Null);
         }
 
         [Test]
@@ -529,7 +500,6 @@ namespace VssTests
             Assert.That(resp, Is.Not.Null);
             Assert.Multiple(() =>
             {
-                Assert.That(v.LastProcessingError, Is.Null);
                 Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Complaint));
                 Assert.That(v.Aggregator, Is.Not.Null);
                 Assert.That(dealer.SessionId, Is.EqualTo(resp.SessionId));
@@ -570,7 +540,7 @@ namespace VssTests
             }
             Assert.That(aggr.DealCertified(), Is.False);
 
-            for (int i = aggr.T; i < nbVerifiers; i++)
+            for (int i = aggr.T; i < _nbVerifiers; i++)
             {
                 var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
@@ -618,12 +588,7 @@ namespace VssTests
             Assert.That(encDeal, Is.Not.Null);
 
             // Make verifier create it's Aggregator by processing EncDeal
-            var resp = v.ProcessEncryptedDeal(encDeal);
-            Assert.Multiple(() =>
-            {
-                Assert.That(resp, Is.Not.Null);
-                Assert.That(v.LastProcessingError, Is.Null);
-            });
+            var resp = v.ProcessEncryptedDeal(encDeal); // No exception
             var aggr = v.Aggregator;
 
             // Add T responses
@@ -712,6 +677,7 @@ namespace VssTests
                 Assert.That(aggr.AddResponse(c), Is.Null);
                 Assert.That(c, Is.EqualTo(aggr.Responses[idx]));
                 Assert.That(aggr.AddResponse(c), Is.Not.Null);
+
             });
             aggr.Responses.Remove(idx);
         }

@@ -233,6 +233,10 @@ namespace dkg.vss
         {
             return Aggregator.Deal;
         }
+        public int[] MissingResponses()
+        {
+            return Aggregator.MissingResponses();
+        }
     }
 
 }

@@ -25,6 +25,7 @@
 
 using dkg.group;
 using dkg.poly;
+using System;
 using System.Linq.Expressions;
 
 namespace dkg.vss
@@ -123,13 +124,13 @@ namespace dkg.vss
 
             var pub = VssTools.GetPub(Verifiers, r.Index);
             if (pub == null)
-                return "VerifyResponse:: index out of bounds in response";
+                return "VerifyResponse: index out of bounds in response";
 
             try
             {
                 Schnorr.Verify(Suite.G, Suite.Hash, pub, r.Hash(), r.Signature);
-            } 
-            catch (DkgError ex) 
+            }
+            catch (DkgError ex)
             {
                 return $"{ex.Source}: ${ex.Message}";
             }
@@ -160,7 +161,7 @@ namespace dkg.vss
         }
         public string? AddResponse(Response r)
         {
-            if (VssTools.GetPub(Verifiers, r.Index) ==  null)
+            if (VssTools.GetPub(Verifiers, r.Index) == null)
                 return "AddResponse: index out of bounds in Complaint";
 
             if (Responses.ContainsKey(r.Index))
@@ -217,6 +218,18 @@ namespace dkg.vss
 
             return baseCondition && !(absentVerifiers > 0);
         }
-
+        // MissingResponses returns the indexes of the expected but missing responses.
+        public int[] MissingResponses()
+        {
+            List<int> absents = [];
+            for (int i = 0; i < Verifiers.Length; i++)
+            {
+                if (!Responses.ContainsKey(i))
+                {
+                    absents.Add(i);
+                }
+            }
+            return [.. absents];
+        }
     }
 }

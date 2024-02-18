@@ -1,6 +1,8 @@
 ﻿using dkg.group;
 using dkg.poly;
 using dkg.vss;
+using Org.BouncyCastle.Pqc.Crypto.Lms;
+using System;
 
 namespace dkg
 {
@@ -376,16 +378,20 @@ namespace dkg
 
             Verifiers.TryGetValue(resp.Index, out Verifier? v);
             if (v == null)
-                throw new DkgError($"dkg: responses received for unknown dealer {resp.Index}", GetType().Name);
+                throw new DkgError($"Responses received for unknown dealer {resp.Index}", GetType().Name);
 
+            string? vssError;
             try
             {
-                v.ProcessResponse(resp.VssResponse);
+                vssError = v.ProcessResponse(resp.VssResponse);
             }
             catch (Exception ex)
             {
                 throw new DkgError($"Error processing the response: {ex.Message}", GetType().Name);
             }
+
+            if (vssError != null)
+                throw new DkgError(vssError, GetType().Name);
 
             int myIdx = Oidx;
             if (!CanIssue || resp.Index != myIdx)
@@ -789,6 +795,39 @@ namespace dkg
                 throw new DkgError("Share do not correspond to public polynomial ><", GetType().Name);
             }
             return new DistKeyShare(finalCoeffs, privateShare, priPoly.Coeffs);
+        }
+
+        // Certified returns true if *all* deals are certified. This method should
+        // be called before the timeout occurs, as to pre-emptively stop the DKG
+        // protocol if it is already finished before the timeout.
+        public bool Certified()
+        {
+            var good = new List<int>();
+            if (IsResharing && CanIssue && !NewPresent)
+            {
+                OldQualIter((i, v) =>
+                {
+                    if (v.MissingResponses().Length > 0)
+                    {
+                        return false;
+                    }
+                    good.Add(i);
+                    return true;
+                });
+            }
+            else
+            {
+                QualIter((i, v) =>
+                {
+                    if (v.MissingResponses().Length > 0)
+                    {
+                        return false;
+                    }
+                    good.Add((int)i);
+                    return true;
+                });
+            }
+            return good.Count >= C.OldNodes.Length;
         }
     }
 }
