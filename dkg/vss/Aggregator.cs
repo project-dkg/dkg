@@ -25,6 +25,7 @@
 
 using dkg.group;
 using dkg.poly;
+using System.Linq.Expressions;
 
 namespace dkg.vss
 {
@@ -120,20 +121,25 @@ namespace dkg.vss
             if (SessionId != null && !SessionId.SequenceEqual(r.SessionId))
                 return "VerifyResponse: receiving inconsistent sessionID in response";
 
-            var pub = VssTools.FindPub(Verifiers, r.Index);
+            var pub = VssTools.GetPub(Verifiers, r.Index);
             if (pub == null)
                 return "VerifyResponse:: index out of bounds in response";
 
-            var err = Schnorr.Verify(pub, r.Hash(), r.Signature);
-            if (err != null)
-                return err;
+            try
+            {
+                Schnorr.Verify(Suite.G, Suite.Hash, pub, r.Hash(), r.Signature);
+            } 
+            catch (DkgError ex) 
+            {
+                return $"{ex.Source}: ${ex.Message}";
+            }
 
             return AddResponse(r);
         }
 
         public string? VerifyJustification(Justification j)
         {
-            if (VssTools.FindPub(Verifiers, j.Index) == null)
+            if (VssTools.GetPub(Verifiers, j.Index) == null)
                 return "VerifyJustification: index out of bounds in justification";
 
             if (!Responses.TryGetValue(j.Index, out Response? r))
@@ -154,7 +160,7 @@ namespace dkg.vss
         }
         public string? AddResponse(Response r)
         {
-            if (VssTools.FindPub(Verifiers, r.Index) ==  null)
+            if (VssTools.GetPub(Verifiers, r.Index) ==  null)
                 return "AddResponse: index out of bounds in Complaint";
 
             if (Responses.ContainsKey(r.Index))

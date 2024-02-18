@@ -27,10 +27,17 @@ using dkg.group;
 
 namespace dkg
 {
+    // Config holds all required information to run a fresh DKG protocol or a
+    // resharing protocol. In the case of a new fresh DKG protocol, one must fill
+    // the following fields: Suite, Longterm, NewNodes, Threshold (opt). In the case
+    // of a resharing protocol, one must fill the following: Suite, Longterm,
+    // OldNodes, NewNodes. If the node using this config is creating new shares
+    // (i.e. it belongs to the current group), the Share field must be filled in
+    // with the current share of the node. If the node using this config is a new
+    // addition and thus has no current share, the PublicCoeffs field be must be
+    // filled in.
     public class Config
     {
-        public IGroup G { get; set; }
-
         // Longterm is the LongTermKey secret key.
         public IScalar LongTermKey { get; set; }
 
@@ -45,7 +52,7 @@ namespace dkg
         public IPoint[] NewNodes { get; set; }
 
         // Share to refresh.
-        //public DistKeyShare Share { get; set; }
+        public DistKeyShare Share { get; set; }
 
         // The threshold to use in order to reconstruct the secret with the produced
         // shares.

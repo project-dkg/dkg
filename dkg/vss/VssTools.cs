@@ -61,13 +61,25 @@ namespace dkg.vss
             return t >= 2 && t <= verifiers.Length;
         }
 
-        public static IPoint? FindPub(IPoint[] verifiers, int idx)
+        public static IPoint? GetPub(IPoint[] verifiers, int idx)
         {
             if (idx >= verifiers.Length || idx < 0)
             {
                 return null;
             }
             return verifiers[idx];
+        }
+
+        public static int FindPubIdx(IPoint[] points, IPoint toFind)
+        {
+            for (int i = 0; i < points.Length; i++)
+            {
+                if (points[i].Equals(toFind))
+                {
+                    return i;
+                }
+            }
+            return -1;
         }
     }
 

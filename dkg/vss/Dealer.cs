@@ -98,13 +98,13 @@ namespace dkg.vss
         // verifier at index i.
         public EncryptedDeal EncryptedDeal(int i)
         {
-            IPoint vPub = VssTools.FindPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range");
+            IPoint vPub = VssTools.GetPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range");
             // gen ephemeral key
             var dhSecret = Suite.G.Scalar();
             var dhPublic = Suite.G.Point().Base().Mul(dhSecret);
             // signs the public key
             var dhPublicBuff = dhPublic.GetBytes();
-            var signature = Schnorr.Sign(LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
+            var signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
 
             // AES128-GCM
             var pre = DhHelper.DhExchange(dhSecret, vPub);
@@ -164,7 +164,7 @@ namespace dkg.vss
                 return null;
 
             var j = new Justification(SessionId, r.Index, Deals[r.Index]);
-            j.Signature = Schnorr.Sign(LongTermKey, j.Hash());
+            j.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, j.Hash());
             return j;
         }
 

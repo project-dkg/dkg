@@ -25,7 +25,7 @@
 
 global using System.Security.Cryptography;
 global using NUnit.Framework;
-global using dkg;
 global using dkg.group;
 global using dkg.poly;
 global using dkg.vss;
+global using dkg;

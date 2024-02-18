@@ -34,4 +34,8 @@ namespace dkg
         public static readonly HashAlgorithm Hash = SHA256.Create();
     }
 
+    public class DkgError : Exception
+    {
+        public DkgError(string msg, string src): base(msg) { Source = src; }
+    }
 }

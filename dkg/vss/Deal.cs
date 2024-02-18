@@ -166,5 +166,28 @@ namespace dkg.vss
         // AEAD encryption of the marshalled deal 
         public byte[] Cipher { get; set; } = cipher;
         public byte[] Tag { get; set; } = tag;
+
+        public byte[] GetBytes()
+        {
+            MemoryStream stream = new();
+            MarshalBinary(stream);
+            return stream.ToArray();
+        }
+
+        public void MarshalBinary(Stream s)
+        {
+            BinaryWriter bw = new(s);
+            bw.Write(DHKey.Length);
+            bw.Write(DHKey);
+            bw.Write(Signature.Length);
+            bw.Write(Signature);
+            bw.Write(Nonce.Length);
+            bw.Write(Nonce);
+            bw.Write(Cipher.Length);
+            bw.Write(Cipher);
+            bw.Write(Tag.Length);
+            bw.Write(Tag);
+        }
+
     }
 }

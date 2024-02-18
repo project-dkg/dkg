@@ -35,24 +35,25 @@
 // when using the edwards25519 group.
 //
 
+using System.Security.Cryptography;
 using dkg.group;
 
 namespace dkg
 {
     public static class Schnorr
     {
-        public static byte[] Sign(IScalar privateKey, byte[] msg)
+        public static byte[] Sign(IGroup g, HashAlgorithm h, IScalar privateKey, byte[] msg)
         {
             // create random secret k and public point commitment R
-            var k = Suite.G.Scalar();
-            var R = Suite.G.Point().Base().Mul(k);
+            var k = g.Scalar();
+            var R = g.Point().Base().Mul(k);
 
             // create hash(publicKey || R || msg)
-            var publicKey = Suite.G.Point().Base().Mul(privateKey);
-            var h = Hash(publicKey, R, msg);
+            var publicKey = g.Point().Base().Mul(privateKey);
+            var hash = Hash(g, h, publicKey, R, msg);
 
             // compute response s = k + x*h
-            var s = k.Add(privateKey.Mul(h));
+            var s = k.Add(privateKey.Mul(hash));
 
             // return R || S
 
@@ -62,13 +63,13 @@ namespace dkg
             return b.ToArray();
         }
 
-        public static string? Verify(IPoint publicKey, byte[] msg, byte[] sig)
+        public static void Verify(IGroup g, HashAlgorithm h, IPoint publicKey, byte[] msg, byte[] sig)
         {
-            const string invalidLength = "Schnorr: invalid length";
-            const string invalidSignature = "Schnorr: invalid signature";
+            const string invalidLength = "Invalid length";
+            const string invalidSignature = "Invalid signature";
 
-            var R = Suite.G.Point();
-            var s = Suite.G.Scalar();
+            var R = g.Point();
+            var s = g.Scalar();
             using (var memstream = new MemoryStream(sig))
             {
                 try
@@ -78,43 +79,41 @@ namespace dkg
                     if (memstream.Position != memstream.Length)
                     // Extra bytes in signature are not acceptable
                     {
-                        return invalidLength;
+                        throw new DkgError(invalidLength, "Schnorr");
                     }
                 }
                 catch
                 // May be System.IO.EndOfStreamException
                 // but also can fail during decoding if some constraints are not met
                 {
-                    return invalidLength;
+                    throw new DkgError(invalidLength, "Schnorr");
                 }
             }
 
             // recompute hash(publicKey || R || msg)
-            var h = Hash(publicKey, R, msg);
+            var hash = Hash(g, h, publicKey, R, msg);
 
             // compute S = g^s
-            var S = Suite.G.Point().Base().Mul(s);
+            var S = g.Point().Base().Mul(s);
             // compute RAh = R + A^h
-            var Ah = publicKey.Mul(h);
+            var Ah = publicKey.Mul(hash);
             var RAs = R.Add(Ah);
 
             if (!S.Equals(RAs))
             {
-                return invalidSignature;
+                throw new DkgError(invalidSignature, "Schnorr");
             }
-
-            return null;
         }
 
-        private static IScalar Hash(IPoint publicPoint, IPoint r, byte[] msg)
+        private static IScalar Hash(IGroup g, HashAlgorithm h, IPoint publicPoint, IPoint r, byte[] msg)
         {
             var b = new MemoryStream();
             r.MarshalBinary(b);
             publicPoint.MarshalBinary(b);
             BinaryWriter w = new(b);
             w.Write(msg);
-            var hash = Suite.Hash.ComputeHash(b.ToArray());
-            return Suite.G.Scalar().SetBytes(hash);
+            var hash = h.ComputeHash(b.ToArray());
+            return g.Scalar().SetBytes(hash);
         }
     }
 }

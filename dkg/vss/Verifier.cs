@@ -86,12 +86,7 @@ namespace dkg.vss
             // verify signature
             try
             {
-                string? error = Schnorr.Verify(DealerKey, encrypted.DHKey, encrypted.Signature);
-                if (error != null)
-                {
-                    LastProcessingError = error;
-                    return null;
-                }
+                Schnorr.Verify(Suite.G, Suite.Hash, DealerKey, encrypted.DHKey, encrypted.Signature);
 
                 // compute shared key and AES526-GCM cipher
                 var dhKey = Suite.G.Point();
@@ -109,7 +104,7 @@ namespace dkg.vss
             } 
             catch (Exception ex) 
             {
-                LastProcessingError = $"DecryptDeal failed. {ex.Message}";
+                LastProcessingError = $"DecryptDeal failed: {ex.Message}";
                 return null;
             }
         }
@@ -138,11 +133,12 @@ namespace dkg.vss
                 }
 
                 var sid = VssTools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
-                var r = new Response(sid, Index);
-
-                r.Complaint = Aggregator.VerifyDeal(d, true);
+                Response r = new(sid, Index)
+                {
+                    Complaint = Aggregator.VerifyDeal(d, true)
+                };
                 r.Status = r.Complaint == ComplaintCode.NoComplaint ? ResponseStatus.Approval : ResponseStatus.Complaint;
-                r.Signature = Schnorr.Sign(LongTermKey, r.Hash());
+                r.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, r.Hash());
                 Aggregator.AddResponse(r);
                 return r;
             }
@@ -203,7 +199,40 @@ namespace dkg.vss
         {
             return Aggregator.VerifyJustification(justification);
         }
+        // SetThreshold is used to specify the expected threshold *before* the verifier
+        // receives anything. Sometimes, a verifier knows the treshold in advance and
+        // should make sure the one it receives from the dealer is consistent. If this
+        // method is not called, the first threshold received is considered as the
+        // "truth".
+        public void SetThreshold(int t)
+        {
+            Aggregator.T = t;
+        }
+        // SetResponseDkg is a method to allow DKG to use VSS
+        // that works on basis of approval only.
+        public void SetResponseDkg(int idx, ResponseStatus status)
+        {
+            Response r = new(Aggregator.SessionId, idx) 
+            { 
+                Status = status 
+            };
+            Aggregator.AddResponse(r);
+        }
 
-}
+        public Dictionary<int, Response> Responses() 
+        { 
+            return Aggregator.Responses; 
+        }
+
+        public bool DealCertified()
+        {
+            return Aggregator.DealCertified();
+        }
+
+        public Deal? Deal()
+        {
+            return Aggregator.Deal;
+        }
+    }
 
 }

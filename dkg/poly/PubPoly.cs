@@ -43,7 +43,7 @@ namespace dkg.poly
     public class PubPoly(IGroup group, IPoint basePoint, IPoint[] cmt) : IEquatable<PubPoly>
     {
         private readonly IGroup g = group; // Cryptographic group
-        private readonly IPoint b = basePoint; // Base point, null for standard base
+        private readonly IPoint b = basePoint ?? group.Point().Base(); // Base point, null for standard base
         public IPoint[] Commits { get; } = cmt; // Commitments to coefficients of the secret sharing polynomial
 
         public PubPoly(IGroup group, IPoint[] cmt) : this(group, group.Point().Base(), cmt)
@@ -59,7 +59,7 @@ namespace dkg.poly
             unchecked // Overflow is fine, just wrap
             {
                 int hash = 17;
-                hash = hash + g.GetHashCode();
+                hash += g.GetHashCode();
                 hash = hash * 23 + b.GetHashCode();
                 foreach (var commit in Commits)
                 {
@@ -81,7 +81,6 @@ namespace dkg.poly
             if (ReferenceEquals(this, q))
                 return true;
 
-
             if (g != q.g)
                 return false;
 
@@ -93,6 +92,12 @@ namespace dkg.poly
                 }
             }
             return true;
+        }
+
+        public override string ToString()
+        {
+            var strs = Commits.Select(c => c.ToString()).ToList();
+            return "{{PubPoly: [ " + string.Join(", ", strs) + " ]}}";
         }
 
         // Threshold returns the secret sharing threshold.

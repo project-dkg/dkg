@@ -25,8 +25,7 @@
 
 namespace ShamirAndPolyTests
 {
-    [TestFixture]
-    public class SecretTests
+    internal class SecretTests
     {
         [Test]
         public void TestSecretRecovery()

@@ -31,6 +31,7 @@
 // scheme allows a committer to commit to a secret sharing polynomial so that
 // a verifier can check the claimed evaluations of the committed polynomial.
 
+using System;
 using System.Runtime.CompilerServices;
 using dkg.group;
 
@@ -110,6 +111,12 @@ namespace dkg.poly
                 }
                 return hash;
             }
+        }
+
+        public override string ToString()
+        {
+            var strs = Coeffs.Select(c => c.ToString()).ToList();
+            return "{{PriPoly: [ " + string.Join(", ", strs) + " ]}}";
         }
 
         // Threshold returns the secret sharing threshold.
@@ -299,12 +306,6 @@ namespace dkg.poly
             }
             return accPoly;
         }
-        public override string ToString()
-        {
-            var strs = Coeffs.Select(c => c.ToString()).ToList();
-            return "[ " + string.Join(", ", strs) + " ]";
-        }
-
         public static PriPoly MinusConst(IGroup g, IScalar c)
         {
             var neg = c.Neg();

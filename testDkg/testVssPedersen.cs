@@ -23,12 +23,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg.group;
-
 namespace VssTests
 {
-    [TestFixture]
-    public class DkgTests
+    internal class DkgTests
     {
         private const int nbVerifiers = 7;
 
@@ -239,7 +236,7 @@ namespace VssTests
             decryptedDeal = verifier.DecryptDeal(encryptedDeal);
             Assert.Multiple(() =>
             {
-                Assert.That(verifier.LastProcessingError, Is.EqualTo("Schnorr: invalid signature"));
+                Assert.That(verifier.LastProcessingError, Is.EqualTo("DecryptDeal failed: Invalid signature"));
                 Assert.That(decryptedDeal, Is.Null);
             });
             encryptedDeal.DHKey = goodDh;
@@ -250,7 +247,7 @@ namespace VssTests
             decryptedDeal = verifier.DecryptDeal(encryptedDeal);
             Assert.Multiple(() =>
             {
-                Assert.That(verifier.LastProcessingError, Is.EqualTo("Schnorr: invalid length"));
+                Assert.That(verifier.LastProcessingError, Is.EqualTo("DecryptDeal failed: Invalid length"));
                 Assert.That(decryptedDeal, Is.Null);
             });
             encryptedDeal.Signature = goodSig;
@@ -262,7 +259,7 @@ namespace VssTests
             Assert.Multiple(() =>
             {
                 Assert.That(verifier.LastProcessingError, 
-                            Is.EqualTo("DecryptDeal failed. The computed authentication tag did not match the input authentication tag."));
+                            Is.EqualTo("DecryptDeal failed: The computed authentication tag did not match the input authentication tag."));
                 Assert.That(decryptedDeal, Is.Null);
             });
             encryptedDeal.Cipher = goodCipher;
@@ -274,7 +271,7 @@ namespace VssTests
             Assert.Multiple(() =>
             {
                 Assert.That(verifier.LastProcessingError, 
-                            Is.EqualTo("DecryptDeal failed. The computed authentication tag did not match the input authentication tag."));
+                            Is.EqualTo("DecryptDeal failed: The computed authentication tag did not match the input authentication tag."));
                 Assert.That(decryptedDeal, Is.Null);
             });
             encryptedDeal.Tag = goodTag;
@@ -307,8 +304,8 @@ namespace VssTests
                 Assert.That(verifier.LastProcessingError, Is.Null);
                 Assert.That(resp.Index, Is.EqualTo(verifier.Index));
                 Assert.That(resp.SessionId, Is.EqualTo(dealer.SessionId));
-                Assert.That(Schnorr.Verify(verifier.PublicKey, resp.Hash(), resp.Signature), Is.Null);
-                Assert.That(resp, Is.EqualTo(verifier.Aggregator.Responses[verifier.Index]));
+                Schnorr.Verify(Suite.G, Suite.Hash, verifier.PublicKey, resp.Hash(), resp.Signature);
+                Assert.That(resp, Is.EqualTo(verifier.Responses()[verifier.Index]));
             });
 
             // wrong encryption
@@ -341,7 +338,7 @@ namespace VssTests
             encryptedDeal = dealer.EncryptedDeal(randIdx);
 
             verifier.Aggregator.Deal = null;
-            verifier.Aggregator.Responses.Remove(verifier.Index);
+            verifier.Responses().Remove(verifier.Index);
             
             resp = verifier.ProcessEncryptedDeal(encryptedDeal);
             Assert.That(resp, Is.Not.Null);
@@ -354,7 +351,7 @@ namespace VssTests
 
             encryptedDeal = dealer.EncryptedDeal(randIdx);
             verifier.Aggregator.Deal = null;
-            verifier.Aggregator.Responses.Remove(verifier.Index);
+            verifier.Responses().Remove(verifier.Index);
             resp = verifier.ProcessEncryptedDeal(encryptedDeal);
             Assert.That(resp, Is.Not.Null);
             Assert.Multiple(() =>
@@ -390,7 +387,7 @@ namespace VssTests
             Assert.Multiple(() =>
             {
                 Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Complaint));
-                Assert.That(resp, Is.EqualTo(verifier.Aggregator.Responses[verifier.Index]));
+                Assert.That(resp, Is.EqualTo(verifier.Responses()[verifier.Index]));
             });
             deal.SecShare.V = goodV;
 
@@ -413,9 +410,9 @@ namespace VssTests
             Assert.That(badJ, Is.Null);
             resp.SessionId = dealer.SessionId;
 
-            verifier.Aggregator.Responses.Remove(verifier.Index);
+            verifier.Responses().Remove(verifier.Index);
             Assert.That(verifier.ProcessJustification(j), Is.Not.Null);
-            verifier.Aggregator.Responses[verifier.Index] = resp;
+            verifier.Responses()[verifier.Index] = resp;
         }
 
         [Test]
@@ -445,15 +442,15 @@ namespace VssTests
             Assert.Multiple(() =>
             {
                 Assert.That(err, Is.Null);
-                Assert.That(v1.Aggregator.Responses.TryGetValue(v2.Index, out Response? r), Is.True);
+                Assert.That(v1.Responses().TryGetValue(v2.Index, out Response? r), Is.True);
                 Assert.That(r, Is.EqualTo(resp2));
             });
             err = v1.ProcessResponse(resp2);
             Assert.That(err, Is.Not.Null);
 
-            v1.Aggregator.Responses.Remove(v2.Index);
+            v1.Responses().Remove(v2.Index);
             var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[v2.Index].Commitments], dealer.T);
-            v1.Aggregator.Responses[v2.Index] = new Response(sessionId, v2.Index) { Status = ResponseStatus.Approval };
+            v1.Responses()[v2.Index] = new Response(sessionId, v2.Index) { Status = ResponseStatus.Approval };
             err = v1.ProcessResponse(resp2);
             Assert.That(err, Is.Not.Null);
         }
@@ -484,7 +481,7 @@ namespace VssTests
             Assert.That(r.Status, Is.EqualTo(ResponseStatus.Complaint));
 
             resp.Index = _verifiersPub.Count;
-            var sig = Schnorr.Sign(v.LongTermKey, resp.Hash());
+            var sig = Schnorr.Sign(Suite.G, Suite.Hash,v.LongTermKey, resp.Hash());
             resp.Signature = sig;
             Assert.That(aggr.VerifyResponse(resp), Is.Not.Null);
             resp.Index = 0;
