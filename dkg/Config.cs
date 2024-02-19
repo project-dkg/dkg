@@ -39,7 +39,7 @@ namespace dkg
     public class Config
     {
         // Longterm is the LongTermKey secret key.
-        public IScalar LongTermKey { get; set; }
+        public IScalar? LongTermKey { get; set; }
 
         // Current group of share holders. It will be null for new DKG.
         public IPoint[] OldNodes { get; set; }
@@ -69,7 +69,7 @@ namespace dkg
         // Reader will be used.
         //public bool UserReaderOnly { get; set; }
 
-        public Config(IScalar longterm, IPoint[] newNodes, int threshold)
+        /*public Config(IScalar longterm, IPoint[] newNodes, int threshold)
         {
             LongTermKey = longterm;
             NewNodes = newNodes;
@@ -77,6 +77,18 @@ namespace dkg
 
             OldNodes = [];
             PublicCoeffs = [];
+        }*/
+
+        public Config() 
+        { 
+            LongTermKey = null;
+            OldNodes = [];
+            PublicCoeffs = [];
+            NewNodes = [];
+            Share = null; 
+            Threshold = 0;
+            OldThreshold = 0;
         }
+
     }
 }

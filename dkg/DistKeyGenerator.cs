@@ -127,11 +127,11 @@ namespace dkg
             else if (isResharing && newPresent)
             {
                 // Check if we can't receive new shares without the public polynomial
-                if (c.PublicCoeffs == null && c.Share == null)
+                if (c.PublicCoeffs.Length == 0 && c.Share == null)
                 {
                     throw new DkgError("Can't receive new shares without the public polynomial", GetType().Name);
                 }
-                else if (c.PublicCoeffs != null)
+                else if (c.PublicCoeffs.Length != 0)
                 {
                     dpub = new PubPoly(Suite.G, Suite.G.Point().Base(), c.PublicCoeffs);
 
@@ -179,7 +179,12 @@ namespace dkg
         // distributed key with the regular DKG protocol.
         public static DistKeyGenerator CreateDistKeyGenerator(IScalar longterm, IPoint[] participants, int t)
         {
-            var c = new Config(longterm, participants, t);
+            var c = new Config()
+            {
+                LongTermKey = longterm, 
+                NewNodes = participants,
+                Threshold = t
+            };
             return new DistKeyGenerator(c);
         }
 
