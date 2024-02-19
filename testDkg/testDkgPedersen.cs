@@ -1214,7 +1214,7 @@ namespace DkgTests
         }
 
         [Test]
-        public void TestDKGResharingPartialNewNodes()
+        public void TestDistKeyResharingPartialNewNodes()
         {
             var (oldPubs, oldPrivs, dkgs) = Generate(_defaultN, VssTools.MinimumT(_defaultN));
             Assert.DoesNotThrow(() => FullExchange(dkgs, true));
