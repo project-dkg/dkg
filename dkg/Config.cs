@@ -62,23 +62,6 @@ namespace dkg
         // configuration.
         public int OldThreshold { get; set; }
 
-        // Reader is an optional field that can hold a user-specified entropy source.
-        //public System.IO.Stream Reader { get; set; }
-
-        // When UserReaderOnly it set to true, only the user-specified entropy source
-        // Reader will be used.
-        //public bool UserReaderOnly { get; set; }
-
-        /*public Config(IScalar longterm, IPoint[] newNodes, int threshold)
-        {
-            LongTermKey = longterm;
-            NewNodes = newNodes;
-            Threshold = threshold;
-
-            OldNodes = [];
-            PublicCoeffs = [];
-        }*/
-
         public Config() 
         { 
             LongTermKey = null;

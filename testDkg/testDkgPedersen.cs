@@ -26,8 +26,18 @@
 
 using dkg;
 using dkg.group;
+using dkg.poly;
+using Google.Protobuf.Collections;
+using Newtonsoft.Json;
 using Org.BouncyCastle.Pqc.Crypto.Lms;
+using Org.BouncyCastle.Tls.Crypto;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
+using System.Net;
+using System.Runtime.Intrinsics.X86;
+using static NUnit.Framework.Constraints.Tolerance;
 
 namespace DkgTests
 {
@@ -209,7 +219,7 @@ namespace DkgTests
         public void TestDistKeySharing()
         {
             var (_, _, dkgs) = Generate(_defaultN, _defaultT);
-            FullExchange(dkgs, true);
+            Assert.DoesNotThrow(()=>FullExchange(dkgs, true));
 
             foreach (var dkg in dkgs)
             {
@@ -381,7 +391,7 @@ namespace DkgTests
             var n = 7;
             var oldT = VssTools.MinimumT(n);
             var (publics, _, dkgs) = Generate(n, oldT);
-            FullExchange(dkgs, true);
+            Assert.DoesNotThrow(()=>FullExchange(dkgs, true));
 
             var newN = dkgs.Length + 1;
             var newT = VssTools.MinimumT(newN);
@@ -512,7 +522,7 @@ namespace DkgTests
                 {
                     continue;
                 }
-                Assert.IsFalse(dkg.Certified());
+                Assert.That(dkg.Certified(), Is.False);
                 Assert.That(dkg.ThresholdCertified(), Is.True);
                 var dks = dkg.DistKeyShare();
                 dkss.Add(dks);
@@ -553,7 +563,7 @@ namespace DkgTests
         {
             var oldT = VssTools.MinimumT(_defaultN);
             var (publics, secrets, dkgs) = Generate(_defaultN, oldT);
-            FullExchange(dkgs, true);
+            Assert.DoesNotThrow(()=>FullExchange(dkgs, true));
 
             var shares = new DistKeyShare[dkgs.Length];
             var sshares = new PriShare[dkgs.Length];
@@ -577,7 +587,7 @@ namespace DkgTests
                 };
                 newDkgs[i] = new DistKeyGenerator(c);
             }
-            FullExchange(newDkgs, true);          // !!!!
+            Assert.DoesNotThrow(()=>FullExchange(newDkgs, true));
             var newShares = new DistKeyShare[dkgs.Length];
             var newSShares = new PriShare[dkgs.Length];
             for (var i = 0; i < newDkgs.Length; i++)
@@ -609,7 +619,7 @@ namespace DkgTests
         {
             int oldT = VssTools.MinimumT(_defaultN);
             var (publics, secrets, dkgs) = Generate(_defaultN, oldT);
-            FullExchange(dkgs, true);
+            Assert.DoesNotThrow(()=>FullExchange(dkgs, true));
 
             int newN = publics.Length - 1;
             var shares = new DistKeyShare[dkgs.Length];
@@ -649,7 +659,7 @@ namespace DkgTests
                 }
             }
 
-            FullExchange(newDkgs, false);
+            Assert.DoesNotThrow(()=>FullExchange(newDkgs, false));
             var newShares = new DistKeyShare[dkgs.Length];
             var newSShares = new PriShare[dkgs.Length - 1];
             for (int i = 0; i < newN; i++)
@@ -698,7 +708,7 @@ namespace DkgTests
             int oldN = _defaultN;
             int oldT = VssTools.MinimumT(oldN);
             var (oldPubs, oldPrivs, dkgs) = Generate(oldN, oldT);
-            FullExchange(dkgs, true);
+            Assert.DoesNotThrow(()=>FullExchange(dkgs, true));
 
             var shares = new DistKeyShare[dkgs.Length];
             var sshares = new PriShare[dkgs.Length];
@@ -934,10 +944,10 @@ namespace DkgTests
 
         // Test resharing to a different set of nodes with two common.
         [Test]
-        public void DKGResharingNewNodes()
+        public void TestDistKeyResharingNewNodes()
         {
             var (oldPubs, oldPrivs, dkgs) = Generate(_defaultN, VssTools.MinimumT(_defaultN));
-            FullExchange(dkgs, true);
+            Assert.DoesNotThrow(()=>FullExchange(dkgs, true));
 
             var shares = new DistKeyShare[dkgs.Length];
             var sshares = new PriShare[dkgs.Length];
@@ -1201,6 +1211,233 @@ namespace DkgTests
             {
                 Assert.Fail(ex.Message);
             }
+        }
+
+        [Test]
+        public void TestDKGResharingPartialNewNodes()
+        {
+            var (oldPubs, oldPrivs, dkgs) = Generate(_defaultN, VssTools.MinimumT(_defaultN));
+            Assert.DoesNotThrow(() => FullExchange(dkgs, true));
+
+            var shares = new DistKeyShare[dkgs.Length];
+            var sshares = new PriShare[dkgs.Length];
+
+            for (var i = 0; i < dkgs.Length; i++)
+            {
+                try
+                {
+                    shares[i] = dkgs[i].DistKeyShare();
+                    sshares[i] = shares[i].Share;
+                }
+                catch (DkgError ex)
+                {
+                    Assert.Fail(ex.Message);
+                }
+            }
+
+            // start resharing to a different group
+            var oldN = _defaultN;
+            var oldT = shares[0].Commits.Length;
+            var newN = oldN + 1;
+            var newT = oldT + 1;
+            var total = oldN + 2;
+            var newOffset = oldN - 1; // idx at which a new key is added to the group
+
+            var newPrivs = new List<IScalar>(oldPrivs.Skip(1));
+            var newPubs = new List<IPoint>(oldPubs.Skip(1));
+            // add two new nodes
+            var (priv1, pub1) = KeyPair();
+            var (priv2, pub2) = KeyPair();
+            newPrivs.AddRange(new[] { priv1, priv2 });
+            newPubs.AddRange(new[] { pub1, pub2 });
+
+            // creating all dkgs
+            var totalDkgs = new DistKeyGenerator[total];
+            for (var i = 0; i < oldN; i++)
+            {
+                var c = new Config
+                {
+                    LongTermKey = oldPrivs[i],
+                    OldNodes = oldPubs,
+                    NewNodes = newPubs.ToArray(),
+                    Share = shares[i],
+                    Threshold = newT,
+                    OldThreshold = oldT,
+                };
+                totalDkgs[i] = new DistKeyGenerator(c);
+                if (i >= 1)
+                {
+                    Assert.Multiple(() =>
+                    {
+                        Assert.That(totalDkgs[i].CanReceive, Is.True);
+                        Assert.That(totalDkgs[i].CanIssue, Is.True);
+                        Assert.That(totalDkgs[i].IsResharing, Is.True);
+                        Assert.That(totalDkgs[i].NewPresent, Is.True);
+                        Assert.That(totalDkgs[i].Oidx, Is.EqualTo(i));
+                        Assert.That(totalDkgs[i].Nidx, Is.EqualTo(i - 1));
+                    });
+                    continue;
+                }
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(totalDkgs[i].CanReceive, Is.False);
+                    Assert.That(totalDkgs[i].CanIssue, Is.True);
+                    Assert.That(totalDkgs[i].IsResharing, Is.True);
+                    Assert.That(totalDkgs[i].NewPresent, Is.False);
+                    Assert.That(totalDkgs[i].Oidx, Is.EqualTo(i));
+                });
+            }
+
+            // the first one is the last old one
+            for (var i = oldN; i < total; i++)
+            {
+                var newIdx = i - oldN + newOffset;
+                var c = new Config
+                {
+                    LongTermKey = newPrivs[newIdx],
+                    OldNodes = oldPubs,
+                    NewNodes = newPubs.ToArray(),
+                    PublicCoeffs = shares[0].Commits,
+                    Threshold = newT,
+                    OldThreshold = oldT,
+                };
+                totalDkgs[i] = new DistKeyGenerator(c);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(totalDkgs[i].CanReceive, Is.True);
+                    Assert.That(totalDkgs[i].CanIssue, Is.False);
+                    Assert.That(totalDkgs[i].IsResharing, Is.True);
+                    Assert.That(totalDkgs[i].NewPresent, Is.True);
+                    Assert.That(totalDkgs[i].Nidx, Is.EqualTo(newIdx));
+                });
+            }
+
+            var newDkgs = totalDkgs.Skip(1).ToArray();
+            var oldDkgs = totalDkgs.Take(oldN).ToArray();
+            Assert.Multiple(() =>
+            {
+                Assert.That(oldDkgs, Has.Length.EqualTo(oldN));
+                Assert.That(newDkgs, Has.Length.EqualTo(newN));
+            });
+
+            // full secret sharing exchange
+            // 1. broadcast deals
+            List<Dictionary<int, DistDeal>> deals = new(newN * newN);
+
+            foreach (var dkg in oldDkgs)
+            {
+                var localDeals = dkg.Deals();
+                Assert.That(localDeals, Is.Not.Null);
+                deals.Add(localDeals);
+
+                dkg.Verifiers.TryGetValue(dkg.Oidx, out Verifier? v);
+
+                if (dkg.CanReceive && dkg.NewPresent)
+                {
+                    Assert.That(v, Is.Not.Null);
+                    // staying nodes don't process their responses locally because they
+                    // broadcast them for the old comities to receive the responses.
+                    int lenResponses = v.Aggregator.Responses.Count;
+                    Assert.That(lenResponses, Is.EqualTo(0));
+                }
+                else
+                {
+                    Assert.That(v, Is.Null);
+                }
+            }
+
+            // the index key indicates the dealer index for which the responses are for
+            Dictionary<int, List<DistResponse>> resps = [];
+
+            for (int i = 0; i < deals.Count; i++)
+            {
+                resps[i] = [];
+                var localDeals = deals[i];
+                foreach (var d in localDeals)
+                {
+                    var dkg = newDkgs[d.Key];
+                    var resp = dkg.ProcessDeal(d.Value);
+                    Assert.That(resp, Is.Not.Null);
+                    Assert.That(resp.VssResponse.Status, Is.EqualTo(ResponseStatus.Approval));
+                    resps[i].Add(resp);
+
+                    if (i == 0)
+                    {
+                        //Console.WriteLine($"dealer (oidx {newDkgs[i].oidx}, nidx {newDkgs[i].nidx}) processing deal to {i} from {d.Index}");
+                    }
+                }
+            }
+
+            // all new dkgs should have the same length of verifiers map
+            foreach (var dkg in newDkgs)
+            {
+                // one deal per old participants
+                Assert.That(dkg.Verifiers, Has.Count.EqualTo(oldN), $"dkg nidx {dkg.Nidx} failing");
+            }
+
+            // 2. Broadcast responses
+            foreach (var dealResponses in resps)
+            {
+                foreach (var resp in dealResponses.Value)
+                {
+                    foreach (var dkg in totalDkgs)
+                    {
+                        // Ignore messages from ourselves
+                        if (dkg.CanReceive && resp.VssResponse.Index == dkg.Nidx)
+                        {
+                            continue;
+                        }
+
+                        try
+                        {
+                            var j = dkg.ProcessResponse(resp);
+                            // Console.WriteLine($"old dkg {dkg.Oidx} process responses from new dkg {dkg.Nidx} about deal {resp.Index}");
+                        }
+                        catch (DkgError ex)
+                        {
+                            Console.WriteLine($"old dkg at (oidx {dkg.Oidx}, nidx {dkg.Nidx}) has received response from idx " + 
+                                              $"{resp.VssResponse.Index} for dealer idx {resp.Index}");
+                            Assert.Fail(ex.Message);
+                        }
+                    }
+                }
+            }
+
+            foreach (var dkg in newDkgs)
+            {
+                for (int i = 0; i < oldN; i++)
+                {
+                    Assert.That(dkg.Verifiers[i].DealCertified(), Is.True,
+                                $"new dkg {dkg.Nidx} has not certified deal {i} => {dkg.Verifiers[i].Responses()}");
+                }
+            }
+
+            // 3. make sure everyone has the same QUAL set
+            foreach (var dkg in newDkgs)
+            {
+                foreach (var dkg2 in oldDkgs)
+                {
+                    Assert.That(dkg.IsInQUAL(dkg2.Oidx), Is.True,
+                                $"new dkg {dkg.Nidx} has not in qual old dkg {dkg2.Oidx} (qual = {dkg.QUAL()})");
+                }
+            }
+
+            var newShares = new DistKeyShare[newN];
+            var newSShares = new PriShare[newN];
+
+            for (int i = 0; i < newDkgs.Length; i++)
+            {
+                var dks = newDkgs[i].DistKeyShare();
+                newShares[i] = dks;
+                newSShares[i] = newShares[i].Share;
+            }
+
+            // check shares reconstruct to the same secret
+            var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT, oldN);
+            var newSecret = PriPoly.RecoverSecret(_g, newSShares, newT, newN);
+
+            Assert.That(newSecret, Is.EqualTo(oldSecret));
         }
 
         // Helper functions

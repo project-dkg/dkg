@@ -119,7 +119,7 @@ namespace dkg.vss
 
         public string? VerifyResponse(Response r)
         {
-            if (SessionId != null && !SessionId.SequenceEqual(r.SessionId))
+            if (SessionId.Length != 0 && !SessionId.SequenceEqual(r.SessionId))
                 return "VerifyResponse: receiving inconsistent sessionID in response";
 
             var pub = VssTools.GetPub(Verifiers, r.Index);

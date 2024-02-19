@@ -439,15 +439,18 @@ namespace dkg
                 agg = new Aggregator(C.NewNodes);
                 OldAggregators[resp.Index] = agg;
             }
-
+            string? err = null;
             try
             {
-                agg.ProcessResponse(resp.VssResponse);
+                err = agg.ProcessResponse(resp.VssResponse);
             }
             catch (Exception ex)
             {
                 throw new DkgError($"Error processing the response in the aggregator: {ex.Message}", GetType().Name);
             }
+
+            if (err != null)
+                throw new DkgError(err, GetType().Name);
 
             if (resp.Index != Oidx)
                 return null;
