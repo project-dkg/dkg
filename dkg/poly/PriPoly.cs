@@ -31,11 +31,13 @@
 // scheme allows a committer to commit to a secret sharing polynomial so that
 // a verifier can check the claimed evaluations of the committed polynomial.
 
+using System;
 using System.Runtime.CompilerServices;
+using dkg.group;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
-namespace dkg
+namespace dkg.poly
 {
 
     // PriPoly represents a secret sharing polynomial.
@@ -109,6 +111,12 @@ namespace dkg
                 }
                 return hash;
             }
+        }
+
+        public override string ToString()
+        {
+            var strs = Coeffs.Select(c => c.ToString()).ToList();
+            return "{{PriPoly: [ " + string.Join(", ", strs) + " ]}}";
         }
 
         // Threshold returns the secret sharing threshold.
@@ -209,7 +217,7 @@ namespace dkg
 
         // RecoverSecret reconstructs the shared secret p(0) from a list of private
         // shares using Lagrange interpolation.
-        public static IScalar RecoverSecret(Secp256k1Group g, PriShare[] shares, int t, int n)
+        public static IScalar RecoverSecret(IGroup g, PriShare[] shares, int t, int n)
         {
             var (x, y) = XyScalar(g, shares, t, n);
 
@@ -298,12 +306,6 @@ namespace dkg
             }
             return accPoly;
         }
-        public override string ToString()
-        {
-            var strs = Coeffs.Select(c => c.ToString()).ToList();
-            return "[ " + string.Join(", ", strs) + " ]";
-        }
-
         public static PriPoly MinusConst(IGroup g, IScalar c)
         {
             var neg = c.Neg();

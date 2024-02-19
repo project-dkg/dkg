@@ -23,8 +23,12 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg.group;
+using dkg.poly;
+using System;
+using System.Linq.Expressions;
 
-namespace dkg
+namespace dkg.vss
 {
     // Aggregator is used to collect all deals, and responses for one protocol run.
     // It brings common functionalities for both Dealer and Verifier structs.
@@ -80,7 +84,7 @@ namespace dkg
                 T = d.T;
             }
 
-            if (!Tools.ValidT(d.T, Verifiers))
+            if (!VssTools.ValidT(d.T, Verifiers))
                 return ComplaintCode.InvalidThreshold;
 
             if (d.T != T)
@@ -115,23 +119,28 @@ namespace dkg
 
         public string? VerifyResponse(Response r)
         {
-            if (SessionId != null && !SessionId.SequenceEqual(r.SessionId))
+            if (SessionId.Length != 0 && !SessionId.SequenceEqual(r.SessionId))
                 return "VerifyResponse: receiving inconsistent sessionID in response";
 
-            var pub = Tools.FindPub(Verifiers, r.Index);
+            var pub = VssTools.GetPub(Verifiers, r.Index);
             if (pub == null)
-                return "VerifyResponse:: index out of bounds in response";
+                return "VerifyResponse: index out of bounds in response";
 
-            var err = Schnorr.Verify(pub, r.Hash(), r.Signature);
-            if (err != null)
-                return err;
+            try
+            {
+                Schnorr.Verify(Suite.G, Suite.Hash, pub, r.Hash(), r.Signature);
+            }
+            catch (DkgError ex)
+            {
+                return $"{ex.Source}: ${ex.Message}";
+            }
 
             return AddResponse(r);
         }
 
         public string? VerifyJustification(Justification j)
         {
-            if (Tools.FindPub(Verifiers, j.Index) == null)
+            if (VssTools.GetPub(Verifiers, j.Index) == null)
                 return "VerifyJustification: index out of bounds in justification";
 
             if (!Responses.TryGetValue(j.Index, out Response? r))
@@ -152,8 +161,8 @@ namespace dkg
         }
         public string? AddResponse(Response r)
         {
-            if (Tools.FindPub(Verifiers, r.Index) ==  null)
-                return "AddResponse: index out of bounds in Complaint";
+            if (VssTools.GetPub(Verifiers, r.Index) == null)
+                return "AddResponse: index out of bounds";
 
             if (Responses.ContainsKey(r.Index))
                 return "AddResponse: response from same origin already exists";
@@ -209,6 +218,18 @@ namespace dkg
 
             return baseCondition && !(absentVerifiers > 0);
         }
-
+        // MissingResponses returns the indexes of the expected but missing responses.
+        public int[] MissingResponses()
+        {
+            List<int> absents = [];
+            for (int i = 0; i < Verifiers.Length; i++)
+            {
+                if (!Responses.ContainsKey(i))
+                {
+                    absents.Add(i);
+                }
+            }
+            return [.. absents];
+        }
     }
 }

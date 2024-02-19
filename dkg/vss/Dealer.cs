@@ -23,19 +23,14 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using Org.BouncyCastle.Crypto.Digests;
-using Org.BouncyCastle.Crypto.Generators;
+using dkg;
+using dkg.group;
+using dkg.poly;
+using Org.BouncyCastle.Utilities;
+using System;
 
-using System.Security.Cryptography;
-
-namespace dkg
+namespace dkg.vss
 {
-    public static class Suite
-    {
-        public static readonly IGroup G = new Secp256k1Group();
-        public static readonly HashAlgorithm Hash = SHA256.Create();
-    }
-
     // Dealer encapsulates for creating and distributing the shares and for
     // replying to any Responses.
     public class Dealer
@@ -60,7 +55,7 @@ namespace dkg
         // returns an error if the t is inferior or equal to 2.
         public Dealer(IScalar longterm, IScalar secret, IPoint[] verifiers, int t)
         {
-            if (!Tools.ValidT(t, verifiers))
+            if (!VssTools.ValidT(t, verifiers))
             {
                 throw new ArgumentException($"Dealer: t {t} invalid");
             }
@@ -77,7 +72,7 @@ namespace dkg
             var F = f.Commit(Suite.G.Point().Base());
             //SecretCommits = [.. F.Commits];
 
-            SessionId = Tools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
+            SessionId = VssTools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
 
             Aggregator = new Aggregator(PublicKey, Verifiers, F.Commits, T, SessionId);
             // C = F + G
@@ -106,13 +101,13 @@ namespace dkg
         // verifier at index i.
         public EncryptedDeal EncryptedDeal(int i)
         {
-            IPoint vPub = Tools.FindPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range"); 
+            IPoint vPub = VssTools.GetPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range");
             // gen ephemeral key
             var dhSecret = Suite.G.Scalar();
             var dhPublic = Suite.G.Point().Base().Mul(dhSecret);
             // signs the public key
             var dhPublicBuff = dhPublic.GetBytes();
-            var signature = Schnorr.Sign(LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
+            var signature = Schnorr.Sign(Suite.G, Suite.Hash, LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
 
             // AES128-GCM
             var pre = DhHelper.DhExchange(dhSecret, vPub);
@@ -172,9 +167,28 @@ namespace dkg
                 return null;
 
             var j = new Justification(SessionId, r.Index, Deals[r.Index]);
-            j.Signature = Schnorr.Sign(LongTermKey, j.Hash());
+            j.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, j.Hash());
             return j;
         }
-        
+        // RecoverSecret recovers the secret shared by a Dealer by gathering at least t
+        // Deals from the verifiers. It returns an error if there is not enough Deals or
+        // if all Deals don't have the same SessionID.
+        public static IScalar RecoverSecret(Deal[] deals, int n, int t)
+        {
+            PriShare[] shares = new PriShare[deals.Length];
+            for (int i = 0; i < deals.Length; i++)
+            {
+                // all sids the same
+                if (deals[i].SessionId.SequenceEqual(deals[0].SessionId))
+                {
+                    shares[i] = deals[i].SecShare;
+                }
+                else
+                {
+                    throw new DkgError("All deals need to have same session id", "RecoverSecret");
+                }
+            }
+            return PriPoly.RecoverSecret(Suite.G, shares, t, n);
+        }
     }
 }

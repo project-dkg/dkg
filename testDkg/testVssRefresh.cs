@@ -23,13 +23,12 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-namespace DkgTests
+namespace VssTests
 {
-    [TestFixture]
-    public class DkgRefreshTests
+    internal class VssRefreshTest
     {
         [Test]
-        public void TestRefreshDKG()
+        public void TestVssRefresh()
         {
             var g = new Secp256k1Group();
             int n = 10;
@@ -170,7 +169,8 @@ namespace DkgTests
             var refreshedPriPoly = PriPoly.RecoverPriPoly(g, newDKGShares, t, n);
 
             // Check that the secret and the corresponding (old) public commit match
-            Assert.That(dkgCommits[0], Is.EqualTo(g.Point().Base().Mul(refreshedPriPoly!.Secret())));
+            Assert.That(refreshedPriPoly, Is.Not.Null);
+            Assert.That(dkgCommits[0], Is.EqualTo(g.Point().Base().Mul(refreshedPriPoly.Secret())));
         }
     }
 }

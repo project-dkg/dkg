@@ -23,11 +23,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg;
-
 namespace Secp256k1Tests
 {
-    public class Secp256k1ScalarTests
+    internal class Secp256k1ScalarTests
     {
         private Secp256k1Scalar _scalar;
         private IScalar _zero;

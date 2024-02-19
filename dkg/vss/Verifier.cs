@@ -24,10 +24,11 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 using System.Runtime.CompilerServices;
+using dkg.group;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
-namespace dkg
+namespace dkg.vss
 {
     // Verifier receives a Deal from a Dealer, can reply with a Complaint, and can
     // collaborate with other Verifiers to reconstruct a secret.
@@ -85,12 +86,7 @@ namespace dkg
             // verify signature
             try
             {
-                string? error = Schnorr.Verify(DealerKey, encrypted.DHKey, encrypted.Signature);
-                if (error != null)
-                {
-                    LastProcessingError = error;
-                    return null;
-                }
+                Schnorr.Verify(Suite.G, Suite.Hash, DealerKey, encrypted.DHKey, encrypted.Signature);
 
                 // compute shared key and AES526-GCM cipher
                 var dhKey = Suite.G.Point();
@@ -108,7 +104,7 @@ namespace dkg
             } 
             catch (Exception ex) 
             {
-                LastProcessingError = $"DecryptDeal failed. {ex.Message}";
+                LastProcessingError = $"DecryptDeal failed: {ex.Message}";
                 return null;
             }
         }
@@ -136,13 +132,30 @@ namespace dkg
                     return null;
                 }
 
-                var sid = Tools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
-                var r = new Response(sid, Index);
+                var sid = VssTools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
+                Response r = new(sid, Index)
+                {
+                    Complaint = Aggregator.VerifyDeal(d, true)
+                };
+                if (r.Complaint == ComplaintCode.NoComplaint)
+                {
+                    r.Status = ResponseStatus.Approval;
+                }
+                else
+                {
+                    r.Status = ResponseStatus.Complaint;
+                    LastProcessingError = Response.GetComplaintMessage(r.Complaint);
+                    if (r.Complaint == ComplaintCode.AlreadyProcessed)
+                        return null;
+                }
 
-                r.Complaint = Aggregator.VerifyDeal(d, true);
-                r.Status = r.Complaint == ComplaintCode.NoComplaint ? ResponseStatus.Approval : ResponseStatus.Complaint;
-                r.Signature = Schnorr.Sign(LongTermKey, r.Hash());
-                Aggregator.AddResponse(r);
+
+
+                r.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, r.Hash());
+                LastProcessingError = Aggregator.AddResponse(r);
+
+                if (LastProcessingError != null) 
+                    return null;
                 return r;
             }
             catch (Exception ex)
@@ -202,7 +215,44 @@ namespace dkg
         {
             return Aggregator.VerifyJustification(justification);
         }
+        // SetThreshold is used to specify the expected threshold *before* the verifier
+        // receives anything. Sometimes, a verifier knows the treshold in advance and
+        // should make sure the one it receives from the dealer is consistent. If this
+        // method is not called, the first threshold received is considered as the
+        // "truth".
+        public void SetThreshold(int t)
+        {
+            Aggregator.T = t;
+        }
+        // SetResponseDkg is a method to allow DKG to use VSS
+        // that works on basis of approval only.
+        public void SetResponseDkg(int idx, ResponseStatus status)
+        {
+            Response r = new(Aggregator.SessionId, idx) 
+            { 
+                Status = status 
+            };
+            Aggregator.AddResponse(r);
+        }
 
-}
+        public Dictionary<int, Response> Responses() 
+        { 
+            return Aggregator.Responses; 
+        }
+
+        public bool DealCertified()
+        {
+            return Aggregator.DealCertified();
+        }
+
+        public Deal? Deal()
+        {
+            return Aggregator.Deal;
+        }
+        public int[] MissingResponses()
+        {
+            return Aggregator.MissingResponses();
+        }
+    }
 
 }

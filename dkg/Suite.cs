@@ -23,50 +23,19 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using System.Security.Cryptography;
+using dkg.group;
+
 namespace dkg
 {
-    public static class Tools
+    public static class Suite
     {
-        public static byte[] CreateSessionId(IPoint publicKey, IPoint[] verifiers, IPoint[] commitments, int t)
-        {
-            MemoryStream strm = new();
-            publicKey.MarshalBinary(strm);
-            foreach (var vrf in verifiers)
-            {
-                vrf.MarshalBinary(strm);
-            }
-
-            foreach (var cmt in commitments)
-            {
-                cmt.MarshalBinary(strm);
-            }
-            strm.Write(BitConverter.GetBytes((uint)t));
-            return Suite.Hash.ComputeHash(strm.ToArray());
-        }
-
-        // MinimumT returns a safe value of T that balances secrecy and robustness.
-        // It expects n, the total number of participants.
-        // T should be adjusted to your threat model. Setting a lower T decreases the
-        // difficulty for an adversary to break secrecy. However, a too large T makes
-        // it possible for an adversary to prevent recovery (robustness).
-        public static int MinimumT(int n)
-        {
-            return (n + 1) / 2;
-        }
-
-        public static bool ValidT(int t, IPoint[] verifiers)
-        {
-            return t >= 2 && t <= verifiers.Length;
-        }
-
-        public static IPoint? FindPub(IPoint[] verifiers, int idx)
-        {
-            if (idx >= verifiers.Length || idx < 0)
-            {
-                return null;
-            }
-            return verifiers[idx];
-        }
+        public static readonly IGroup G = new Secp256k1Group();
+        public static readonly HashAlgorithm Hash = SHA256.Create();
     }
 
+    public class DkgError : Exception
+    {
+        public DkgError(string msg, string src): base(msg) { Source = src; }
+    }
 }

@@ -25,8 +25,7 @@
 
 namespace ShamirAndPolyTests
 {
-    [TestFixture]
-    public class SecretTests
+    internal class SecretTests
     {
         [Test]
         public void TestSecretRecovery()
@@ -138,6 +137,9 @@ namespace ShamirAndPolyTests
             PriPoly p132 = p13.Add(p2);
 
             Assert.That(p132, Is.EqualTo(p123), "Private polynomials not equal");
+
+            Assert.That(p132, Is.Not.EqualTo(null));
+            Assert.That(p132, Is.Not.EqualTo(p12));
         }
         [Test]
         public void TestPriPolyAdd()
@@ -285,6 +287,9 @@ namespace ShamirAndPolyTests
             var P132 = P13.Add(P2);
 
             Assert.That(P132, Is.EqualTo(P123), "Public polynomials not equal");
+
+            Assert.That(P132, Is.Not.EqualTo(null));
+            Assert.That(P132, Is.Not.EqualTo(P12));
         }
 
         [Test]

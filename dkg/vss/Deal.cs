@@ -24,7 +24,13 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-namespace dkg
+using dkg;
+using dkg.group;
+using dkg.poly;
+using Org.BouncyCastle.Utilities;
+using System;
+
+namespace dkg.vss
 {
     // Deal encapsulates the verifiable secret share and is sent by the dealer to a verifier.
     public class Deal : IMarshalling, IEquatable<Deal>
@@ -163,5 +169,27 @@ namespace dkg
         // AEAD encryption of the marshalled deal 
         public byte[] Cipher { get; set; } = cipher;
         public byte[] Tag { get; set; } = tag;
+
+        public byte[] GetBytes()
+        {
+            MemoryStream stream = new();
+            MarshalBinary(stream);
+            return stream.ToArray();
+        }
+
+        public void MarshalBinary(Stream s)
+        {
+            BinaryWriter bw = new(s);
+            bw.Write(DHKey.Length);
+            bw.Write(DHKey);
+            bw.Write(Signature.Length);
+            bw.Write(Signature);
+            bw.Write(Nonce.Length);
+            bw.Write(Nonce);
+            bw.Write(Cipher.Length);
+            bw.Write(Cipher);
+            bw.Write(Tag.Length);
+            bw.Write(Tag);
+        }
     }
 }

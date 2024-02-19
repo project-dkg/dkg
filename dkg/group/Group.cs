@@ -23,12 +23,14 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-namespace dkg
+// Generic Group interface definitions
+
+namespace dkg.group
 {
     public interface IMarshalling
     {
         public void MarshalBinary(Stream s);
-        public Int32 MarshalSize();
+        public int MarshalSize();
         public void UnmarshalBinary(Stream s);
     }
 
@@ -45,7 +47,7 @@ namespace dkg
         // Clone creates a new Scalar with the same value.
         IScalar Clone();
         // SetInt64 sets the receiver to a small integer value.
-        IScalar SetInt64(Int64 v);
+        IScalar SetInt64(long v);
         // Set to the additive identity (0).
         IScalar Zero();
         // Modular sum of this and s2.
@@ -150,7 +152,7 @@ namespace dkg
     {
         // Max length of scalars in bytes
         string ToString();
-        
+
         // Max length of scalars in bytes
         int ScalarLen();
         // Create new scalar
