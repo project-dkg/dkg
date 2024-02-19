@@ -162,7 +162,7 @@ namespace dkg.vss
         public string? AddResponse(Response r)
         {
             if (VssTools.GetPub(Verifiers, r.Index) == null)
-                return "AddResponse: index out of bounds in Complaint";
+                return "AddResponse: index out of bounds";
 
             if (Responses.ContainsKey(r.Index))
                 return "AddResponse: response from same origin already exists";

@@ -403,12 +403,10 @@ namespace VssTests
             // valid complaint
             // already seen twice
             resp = verifier.ProcessEncryptedDeal(encryptedDeal);
-            Assert.That(resp, Is.Not.Null);
             Assert.Multiple(() =>
             {
-                Assert.That(verifier.LastProcessingError, Is.Null);
-                Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Complaint));
-                Assert.That(resp.Complaint, Is.EqualTo(ComplaintCode.AlreadyProcessed));
+                Assert.That(resp, Is.Null);
+                Assert.That(verifier.LastProcessingError, Is.Not.Null);
             });
         }
 

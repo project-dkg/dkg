@@ -137,9 +137,25 @@ namespace dkg.vss
                 {
                     Complaint = Aggregator.VerifyDeal(d, true)
                 };
-                r.Status = r.Complaint == ComplaintCode.NoComplaint ? ResponseStatus.Approval : ResponseStatus.Complaint;
+                if (r.Complaint == ComplaintCode.NoComplaint)
+                {
+                    r.Status = ResponseStatus.Approval;
+                }
+                else
+                {
+                    r.Status = ResponseStatus.Complaint;
+                    LastProcessingError = Response.GetComplaintMessage(r.Complaint);
+                    if (r.Complaint == ComplaintCode.AlreadyProcessed)
+                        return null;
+                }
+
+
+
                 r.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, r.Hash());
-                Aggregator.AddResponse(r);
+                LastProcessingError = Aggregator.AddResponse(r);
+
+                if (LastProcessingError != null) 
+                    return null;
                 return r;
             }
             catch (Exception ex)

@@ -155,8 +155,8 @@ namespace dkg
             Dealer = dealer!;
             Verifiers = [];
             OldAggregators = [];
-            Oidx = oidx;
-            Nidx = nidx;
+            Oidx = oldPresent ? oidx : 0;
+            Nidx = newPresent ? nidx : 0;
             OldT = oldThreshold;
             NewT = newThreshold;
             IsResharing = isResharing;
@@ -828,7 +828,7 @@ namespace dkg
                     {
                         return false;
                     }
-                    good.Add((int)i);
+                    good.Add(i);
                     return true;
                 });
             }
