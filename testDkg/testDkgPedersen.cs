@@ -24,7 +24,6 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg;
 using dkg.group;
 using dkg.poly;
 using Google.Protobuf.Collections;
@@ -118,8 +117,7 @@ namespace DkgTests
             });
 
             // duplicate
-            rec.ProcessDeal(deal);
-            // Assert.Throws<DkgError>(() => rec.ProcessDeal(deal));
+            Assert.Throws<DkgError>(() => rec.ProcessDeal(deal));
 
             // wrong index
             var goodIdx = deal.Index;
@@ -257,7 +255,7 @@ namespace DkgTests
             var secret = PriPoly.RecoverSecret(_g, shares, _defaultN, _defaultN);
             Assert.That(secret, Is.Not.Null);
 
-            var secretCoeffs = poly.Coeffs;
+            var secretCoeffs = poly!.Coeffs;
             Assert.That(secretCoeffs[0], Is.EqualTo(secret));
 
             var commitSecret = _g.Point().Base().Mul(secret);
@@ -802,7 +800,7 @@ namespace DkgTests
             while (selected.Count < alive)
             {
                 int i = new Random().Next(oldDkgs.Length);
-                string str = oldDkgs[i].LongTermKey.ToString();
+                string str = oldDkgs[i].LongTermKey.ToString()!;
                 if (selected.ContainsKey(str))
                 {
                     continue;

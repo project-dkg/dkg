@@ -1,4 +1,4 @@
-// Copyright (C) 2024 Maxim [maxirmx] Samsonov (www.sw.consulting)
+﻿// Copyright (C) 2024 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 // This file is a part of dkg applcation
 //
@@ -23,10 +23,29 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-global using System.Security.Cryptography;
-global using NUnit.Framework;
-global using dkg.group;
-global using dkg.poly;
-global using dkg.vss;
-global using dkg.share;
-global using dkg;
+using dkg.vss;
+
+namespace dkg.share
+{
+    // Response holds the Response from another participant as well as the index of
+    // the target Dealer.
+    public class DistResponse(int index, Response vssResponse)
+    {
+        // Index of the Dealer for which this response is for
+        public int Index { get; set; } = index;
+
+        // Response issued from another participant
+        public Response VssResponse { get; set; } = vssResponse;
+    }
+
+    // Justification holds the Justification from a Dealer as well as the index of
+    // the Dealer in question.
+    public class DistJustification(int index, Justification vssJustification)
+    {
+        // Index of the Dealer who answered with this Justification
+        public int Index { get; set; } = index;
+
+        // Justification issued from the Dealer
+        public Justification VssJustification { get; set; } = vssJustification;
+    }
+}

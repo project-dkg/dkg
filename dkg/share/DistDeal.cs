@@ -1,4 +1,4 @@
-// Copyright (C) 2024 Maxim [maxirmx] Samsonov (www.sw.consulting)
+﻿// Copyright (C) 2024 Maxim [maxirmx] Samsonov (www.sw.consulting)
 // All rights reserved.
 // This file is a part of dkg applcation
 //
@@ -23,10 +23,37 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-global using System.Security.Cryptography;
-global using NUnit.Framework;
-global using dkg.group;
-global using dkg.poly;
-global using dkg.vss;
-global using dkg.share;
-global using dkg;
+using dkg.vss;
+
+namespace dkg.share
+{
+    // Deal holds the Deal for one participant as well as the index of the issuing
+    // Dealer.
+    public class DistDeal(int index, EncryptedDeal encryptedDeal)
+    {
+        // Index of the Dealer in the list of participants
+        public int Index { get; set; } = index;
+
+        // Deal issued for another participant
+        public EncryptedDeal VssDeal { get; set; } = encryptedDeal;
+
+        // Signature over the whole message
+        public byte[] Signature { get; set; } = [];
+
+        // GetBytes returns a binary representation of this deal, which is the
+        // message signed in a dkg deal.
+        public byte[] GetBytes()
+        {
+            MemoryStream stream = new();
+            MarshalBinary(stream);
+            return stream.ToArray();
+        }
+
+        public void MarshalBinary(Stream s)
+        {
+            BinaryWriter bw = new(s);
+            bw.Write(Index);
+            VssDeal.MarshalBinary(s);
+        }
+    }
+}

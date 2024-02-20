@@ -1,11 +1,35 @@
-﻿using dkg.group;
+﻿// Copyright (C) 2024 Maxim [maxirmx] Samsonov (www.sw.consulting)
+// All rights reserved.
+// This file is a part of dkg applcation
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS
+// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+using dkg.group;
 using dkg.poly;
 using dkg.vss;
-using Org.BouncyCastle.Pqc.Crypto.Lms;
-using System;
 
-namespace dkg
+namespace dkg.share
 {
+    // DistKeyGenerator is ableto drive the DKG protocol.
     public class DistKeyGenerator
     {
         // config driving the behavior of DistKeyGenerator
@@ -51,7 +75,7 @@ namespace dkg
         public DistKeyGenerator(Config c)
         {
             // Check if both new and old nodes list are empty
-            if (c.NewNodes.Length == 0 &&  c.OldNodes.Length == 0)
+            if (c.NewNodes.Length == 0 && c.OldNodes.Length == 0)
             {
                 throw new DkgError("Can't run with empty node list", GetType().Name);
             }
@@ -78,6 +102,10 @@ namespace dkg
 
             // canReceive is true by default since in the default DKG mode everyone participates
             bool canReceive = true;
+            if (c.LongTermKey == null)
+            {
+                throw new DkgError("LongTermKey cannot be null", GetType().Name);
+            }
             IPoint pub = Suite.G.Point().Base().Mul(c.LongTermKey);
 
             int oidx, nidx;
@@ -181,7 +209,7 @@ namespace dkg
         {
             var c = new Config()
             {
-                LongTermKey = longterm, 
+                LongTermKey = longterm,
                 NewNodes = participants,
                 Threshold = t
             };
@@ -202,7 +230,7 @@ namespace dkg
                     throw new DkgError("Duplicate public key in NewNodes list", GetType().Name);
                 }
                 alreadyTaken[pub.ToString()!] = true;
-                Verifier ver = new(C.LongTermKey, pub, verifierList);
+                Verifier ver = new(C.LongTermKey!, pub, verifierList);
                 // set that the number of approval for this deal must be at the given threshold regarding the new nodes. (see config)
                 ver.SetThreshold(C.Threshold);
                 verifiers[i] = ver;
@@ -290,7 +318,7 @@ namespace dkg
                 throw new DkgError("dkg: unexpected deal for unlisted dealer in a new list", GetType().Name);
 
             IPoint? pub = (IsResharing ? VssTools.GetPub(C.OldNodes, dd.Index) :
-                                         VssTools.GetPub(C.NewNodes, dd.Index)) ?? 
+                                         VssTools.GetPub(C.NewNodes, dd.Index)) ??
                                          throw new DkgError("dkg: dist deal out of bounds index", GetType().Name);
 
             // verify signature
@@ -318,6 +346,9 @@ namespace dkg
             {
                 throw new DkgError($"Error processing encrypted deal: {e.Message}", GetType().Name);
             }
+
+            if (resp == null)
+                throw new DkgError(ver.LastProcessingError ?? "Unknow error", GetType().Name);
 
             Func<DistResponse> reject = () =>
             {
@@ -379,7 +410,7 @@ namespace dkg
         public DistJustification? ProcessResponse(DistResponse resp)
         {
             if (IsResharing && CanIssue && !NewPresent)
-                 return ProcessResharingResponse(resp);
+                return ProcessResharingResponse(resp);
 
             Verifiers.TryGetValue(resp.Index, out Verifier? v);
             if (v == null)
@@ -706,7 +737,7 @@ namespace dkg
                 throw new DkgError("Should not expect to compute any dist. share", GetType().Name);
             }
 
-                return IsResharing ? ResharingKey() : DkgKey();
+            return IsResharing ? ResharingKey() : DkgKey();
         }
 
         public DistKeyShare DkgKey()
@@ -717,7 +748,7 @@ namespace dkg
             QualIter((i, v) =>
             {
                 // share of dist. secret = sum of all share received.
-                var deal = v.Deal();
+                var deal = v.Deal() ?? throw new DkgError("Deal is not defined", GetType().Name);
                 var s = deal.SecShare.V;
                 sh = sh.Add(s);
                 // Dist. public key = sum of all revealed commitments
@@ -744,7 +775,7 @@ namespace dkg
             {
                 throw new DkgError($"Error in DkgKey: {err}", GetType().Name);
             }
-            var commits = pub.Commits;
+            var commits = pub!.Commits;
 
             return new DistKeyShare(commits, new PriShare(Nidx, sh), Dealer.SecretPoly.Coeffs);
         }
@@ -756,7 +787,7 @@ namespace dkg
             var coeffs = new IPoint[C.OldNodes.Length][];
             QualIter((i, v) =>
             {
-                var deal = v.Deal();
+                var deal = v.Deal() ?? throw new DkgError("Deal is not defined", GetType().Name);
                 coeffs[i] = deal.Commitments;
                 // share of dist. secret. Invertion of rows/column
                 deal.SecShare.I = i;
@@ -768,7 +799,7 @@ namespace dkg
             // the old threshold condition
             var priPoly = PriPoly.RecoverPriPoly(Suite.G, shares, OldT, C.OldNodes.Length) ??
                           throw new DkgError("Could not recover PriPoly", GetType().Name);
-             
+
             var privateShare = new PriShare(Nidx, priPoly.Secret());
 
             // recover public polynomial by interpolating coefficient-wise all
