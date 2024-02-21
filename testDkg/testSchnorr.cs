@@ -24,8 +24,6 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 
-using dkg.group;
-
 namespace SchnorrTests
 {
     internal class SchnorrTests

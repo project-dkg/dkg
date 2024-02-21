@@ -25,6 +25,7 @@
 
 using System.Runtime.CompilerServices;
 using dkg.group;
+using dkg.util;
 
 [assembly: InternalsVisibleTo("testDkg")]
 

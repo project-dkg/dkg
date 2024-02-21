@@ -23,12 +23,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using Org.BouncyCastle.Utilities;
-using System.Runtime.Intrinsics.Arm;
-using System;
 using System.Security.Cryptography;
 
-namespace dkg
+namespace dkg.util
 {
     // Class RandomStream implements a view random number generator as a stream
     public class RandomStream : Stream

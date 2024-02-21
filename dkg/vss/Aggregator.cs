@@ -25,8 +25,7 @@
 
 using dkg.group;
 using dkg.poly;
-using System;
-using System.Linq.Expressions;
+using dkg.util;
 
 namespace dkg.vss
 {

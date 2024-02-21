@@ -335,7 +335,6 @@ namespace Secp256k1Tests
 
             var extractedData = embedded.ExtractData();
             Assert.That(message.Substring(0, _group.EmbedLen()) , Is.EqualTo(Encoding.UTF8.GetString(extractedData)));
-
         }
     }
 }

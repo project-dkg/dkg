@@ -25,6 +25,7 @@
 
 using dkg.group;
 using dkg.poly;
+using dkg.util;
 using dkg.vss;
 
 namespace dkg.share

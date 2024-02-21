@@ -30,7 +30,7 @@ using Org.BouncyCastle.Crypto.Parameters;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace dkg
+namespace dkg.util
 {
     public static class DhHelper
     {

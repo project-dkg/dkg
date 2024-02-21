@@ -28,7 +28,7 @@
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Math.EC;
-using System.Security.Cryptography;
+using dkg.util;
 
 using ECPoint = Org.BouncyCastle.Math.EC.ECPoint;
 using ECCurve = Org.BouncyCastle.Math.EC.ECCurve;
@@ -237,7 +237,7 @@ namespace dkg.group
         }
         public override string ToString()
         {
-            return $"{{Secp256k1 Point: {_point.ToString()}}}";
+            return $"{{Secp256k1 Point: {_point}}}";
         }
         public override int GetHashCode()
         {

@@ -38,7 +38,7 @@
 using System.Security.Cryptography;
 using dkg.group;
 
-namespace dkg
+namespace dkg.util
 {
     public static class Schnorr
     {

@@ -24,6 +24,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 global using NUnit.Framework;
+global using dkg.util;
 global using dkg.group;
 global using dkg.poly;
 global using dkg.vss;

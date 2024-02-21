@@ -25,6 +25,8 @@
 
 // Generic Group interface definitions
 
+using dkg.util;
+
 namespace dkg.group
 {
     public interface IMarshalling
