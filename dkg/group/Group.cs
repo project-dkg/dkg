@@ -25,6 +25,8 @@
 
 // Generic Group interface definitions
 
+using dkg.util;
+
 namespace dkg.group
 {
     public interface IMarshalling
@@ -58,6 +60,8 @@ namespace dkg.group
         IScalar Neg();
         // Set to the multiplicative identity (1).
         IScalar One();
+        // Modulus
+        IScalar Mod(IScalar b);
         // Set to the modular product of scalars
         IScalar Mul(IScalar b);
         // Set to the modular division of scalars
@@ -102,7 +106,11 @@ namespace dkg.group
         IPoint Neg();
         // Multiply point by the scalar s.
         IPoint Mul(IScalar s);
+        // Convert to byte array
         byte[] GetBytes();
+        // Extract embedded data
+        public byte[] ExtractData();
+
     }
 
     // AllowsVarTime allows callers to determine if a given kyber.Scalar
@@ -159,9 +167,15 @@ namespace dkg.group
         IScalar Scalar();
         // Max length of point in bytes
         int PointLen();
-        // Create new point
+        // Create new (random) point
         IPoint Point();
+        // Create new (base) point
+        IPoint Base();
         // Create new random stream
         RandomStream RndStream();
+        // Return number of bytes that can be embedded into points on this curve.
+        public int EmbedLen();
+        // Embed data into the point on the curve
+        public IPoint EmbedData(byte[] data);
     }
 }

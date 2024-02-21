@@ -38,7 +38,7 @@
 using System.Security.Cryptography;
 using dkg.group;
 
-namespace dkg
+namespace dkg.util
 {
     public static class Schnorr
     {
@@ -46,10 +46,10 @@ namespace dkg
         {
             // create random secret k and public point commitment R
             var k = g.Scalar();
-            var R = g.Point().Base().Mul(k);
+            var R = g.Base().Mul(k);
 
             // create hash(publicKey || R || msg)
-            var publicKey = g.Point().Base().Mul(privateKey);
+            var publicKey = g.Base().Mul(privateKey);
             var hash = Hash(g, h, publicKey, R, msg);
 
             // compute response s = k + x*h
@@ -94,7 +94,7 @@ namespace dkg
             var hash = Hash(g, h, publicKey, R, msg);
 
             // compute S = g^s
-            var S = g.Point().Base().Mul(s);
+            var S = g.Base().Mul(s);
             // compute RAh = R + A^h
             var Ah = publicKey.Mul(hash);
             var RAs = R.Add(Ah);

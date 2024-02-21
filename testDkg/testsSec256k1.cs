@@ -23,6 +23,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using System.Text;
+using static Google.Protobuf.Reflection.FeatureSet.Types;
+
 namespace Secp256k1Tests
 {
     internal class Secp256k1ScalarTests
@@ -44,11 +47,11 @@ namespace Secp256k1Tests
         {
             _scalar.Pick(new RandomStream());
             Assert.That(_scalar, Is.Not.EqualTo(null));
-            
-            Secp256k1Scalar? scalar2 = new(); 
+
+            Secp256k1Scalar? scalar2 = new();
             scalar2.Pick(new RandomStream());
             Assert.That(_scalar, Is.Not.EqualTo(scalar2));
-            
+
             object? obj = new Secp256k1Point();
             Assert.That(_scalar, Is.Not.EqualTo(obj));
 
@@ -157,7 +160,7 @@ namespace Secp256k1Tests
             byte[] bytes = _scalar.GetBytes();
             Secp256k1Scalar scalar2 = new();
             scalar2.SetBytes(bytes);
-            Assert.That(_scalar.Equals(scalar2)); 
+            Assert.That(_scalar.Equals(scalar2));
         }
 
         [Test]
@@ -166,7 +169,7 @@ namespace Secp256k1Tests
             _scalar.Pick(new RandomStream());
             MemoryStream stream = new();
             _scalar.MarshalBinary(stream);
-            Assert.That(stream.Length, Is.EqualTo(_scalar.MarshalSize())); 
+            Assert.That(stream.Length, Is.EqualTo(_scalar.MarshalSize()));
             stream.Position = 0;
             Secp256k1Scalar scalar2 = new();
             scalar2.UnmarshalBinary(stream);
@@ -284,28 +287,54 @@ namespace Secp256k1Tests
         public void TestScalarLen()
         {
             int scalarLen = _group.ScalarLen();
-            Assert.That(scalarLen, Is.EqualTo(32)); 
+            Assert.That(scalarLen, Is.EqualTo(32));
         }
 
         [Test]
         public void TestPointLen()
         {
             int pointLen = _group.PointLen();
-            Assert.That(pointLen, Is.EqualTo(33)); 
+            Assert.That(pointLen, Is.EqualTo(33));
         }
 
         [Test]
         public void TestScalar()
         {
             IScalar scalar = _group.Scalar();
-            Assert.That(scalar, Is.InstanceOf<Secp256k1Scalar>()); 
+            Assert.That(scalar, Is.InstanceOf<Secp256k1Scalar>());
         }
 
         [Test]
         public void TestPoint()
         {
             IPoint point = _group.Point();
-            Assert.That(point, Is.InstanceOf<Secp256k1Point>()); 
+            Assert.That(point, Is.InstanceOf<Secp256k1Point>());
+        }
+
+        [Test]
+        public void TestEmbed()
+        {
+            string message = "Hello, world!";
+            byte[] plainData = Encoding.UTF8.GetBytes(message);
+            var embedded = _group.EmbedData(plainData);
+
+            var extractedData = embedded.ExtractData();
+            Assert.Multiple(() =>
+            {
+                Assert.That(plainData, Is.EqualTo(extractedData));
+                Assert.That(message, Is.EqualTo(Encoding.UTF8.GetString(extractedData)));
+            });
+        }
+
+        [Test]
+        public void TestEmbedTooLong()
+        {
+            string message = "Hello, world! This message is a little bit longer then EC group can handle :)";
+            byte[] plainData = Encoding.UTF8.GetBytes(message);
+            var embedded = _group.EmbedData(plainData);
+
+            var extractedData = embedded.ExtractData();
+            Assert.That(message.Substring(0, _group.EmbedLen()) , Is.EqualTo(Encoding.UTF8.GetString(extractedData)));
         }
     }
 }

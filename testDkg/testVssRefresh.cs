@@ -54,7 +54,7 @@ namespace VssTests
                 {
                     var sij = priShares[i][j];
                     // s_ij * G
-                    var sijG = g.Point().Base().Mul(sij.V);
+                    var sijG = g.Base().Mul(sij.V);
                     Assert.That(pubShares[i][j].V, Is.EqualTo(sijG));
                 }
             }
@@ -104,7 +104,7 @@ namespace VssTests
                 subPriShares[i] = subPriPolys[i].Shares(n);
                 subPubPolys[i] = subPriPolys[i].Commit();
                 subPubShares[i] = subPubPolys[i].Shares(n);
-                Assert.That(subPubShares[i][0].V, Is.EqualTo(g.Point().Base().Mul(subPriShares[i][0].V)));
+                Assert.That(subPubShares[i][0].V, Is.EqualTo(g.Base().Mul(subPriShares[i][0].V)));
             }
 
             // Handout shares to new nodes column-wise and verify them
@@ -118,7 +118,7 @@ namespace VssTests
                     // Check 1: Verify that the received individual private subshares s_ji
                     // is correct by evaluating the public commitment vector
                     tmpPriShares[j] = new PriShare(j, subPriShares[j][i].V); // Shares that participant i gets from j
-                    Assert.That(subPubPolys[j].Eval(i).V, Is.EqualTo(g.Point().Base().Mul(tmpPriShares[j].V)));
+                    Assert.That(subPubPolys[j].Eval(i).V, Is.EqualTo(g.Base().Mul(tmpPriShares[j].V)));
 
                     // Check 2: Verify that the received sub public shares are
                     // commitments to the original secret
@@ -170,7 +170,7 @@ namespace VssTests
 
             // Check that the secret and the corresponding (old) public commit match
             Assert.That(refreshedPriPoly, Is.Not.Null);
-            Assert.That(dkgCommits[0], Is.EqualTo(g.Point().Base().Mul(refreshedPriPoly.Secret())));
+            Assert.That(dkgCommits[0], Is.EqualTo(g.Base().Mul(refreshedPriPoly.Secret())));
         }
     }
 }

@@ -179,7 +179,7 @@ namespace dkg.poly
         // the standard base if b == nil.
         public PubPoly Commit()
         {
-            return Commit(g.Point().Base());
+            return Commit(g.Base());
         }
          public PubPoly Commit(IPoint b)
         {

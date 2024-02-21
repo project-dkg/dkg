@@ -23,9 +23,10 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-global using System.Security.Cryptography;
 global using NUnit.Framework;
+global using dkg.util;
 global using dkg.group;
 global using dkg.poly;
 global using dkg.vss;
+global using dkg.share;
 global using dkg;

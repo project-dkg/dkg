@@ -23,9 +23,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg;
-using Org.BouncyCastle.Ocsp;
-using System.Net.Sockets;
+using dkg.util;
 
 namespace VssTests
 {
@@ -70,7 +68,7 @@ namespace VssTests
         private (IScalar prv, IPoint pub) KeyPair()
         {
             var prv = _g.Scalar();
-            var pub = _g.Point().Base().Mul(prv);
+            var pub = _g.Base().Mul(prv);
             return (prv, pub);
         }
 
@@ -241,7 +239,7 @@ namespace VssTests
             // Mark remaining verifiers as timed-out
             dealer.SetTimeout();
 
-            IPoint sc = Suite.G.Point().Base().Mul(_secret);
+            IPoint sc = Suite.G.Base().Mul(_secret);
             Assert.Multiple(() =>
             {
                 Assert.That(aggr.DealCertified(), Is.True);
@@ -547,7 +545,7 @@ namespace VssTests
             Assert.Multiple(() =>
             {
                 Assert.That(aggr.DealCertified(), Is.True);
-                Assert.That(dealer.SecretCommit(), Is.EqualTo(Suite.G.Point().Base().Mul(_secret)));
+                Assert.That(dealer.SecretCommit(), Is.EqualTo(Suite.G.Base().Mul(_secret)));
             });
         }
 
@@ -700,10 +698,10 @@ namespace VssTests
         [Test]
         public void TestDhExchange()
         {
-            IPoint pub = _g.Point().Base();
+            IPoint pub = _g.Base();
             IScalar priv = _g.Scalar();
             IPoint point = DhHelper.DhExchange(priv, pub);
-            Assert.That(point, Is.EqualTo(_g.Point().Base().Mul(priv)));
+            Assert.That(point, Is.EqualTo(_g.Base().Mul(priv)));
         }
 
         [Test]

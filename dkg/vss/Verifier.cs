@@ -25,6 +25,7 @@
 
 using System.Runtime.CompilerServices;
 using dkg.group;
+using dkg.util;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
@@ -56,7 +57,7 @@ namespace dkg.vss
             LastProcessingError = null;
             LongTermKey = longterm;
             DealerKey = dealerKey;
-            PublicKey = Suite.G.Point().Base().Mul(LongTermKey);
+            PublicKey = Suite.G.Base().Mul(LongTermKey);
             Verifiers = verifiers;
             bool ok = false;
             int index = -1;

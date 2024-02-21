@@ -23,60 +23,37 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
+using dkg.vss;
 
-namespace dkg.util
+namespace dkg.share
 {
-    // Class RandomStream implements a view random number generator as a stream
-    public class RandomStream : Stream
+    // Deal holds the Deal for one participant as well as the index of the issuing
+    // Dealer.
+    public class DistDeal(int index, EncryptedDeal encryptedDeal)
     {
-        private RandomNumberGenerator _rng;
+        // Index of the Dealer in the list of participants
+        public int Index { get; set; } = index;
 
-        public RandomStream()
+        // Deal issued for another participant
+        public EncryptedDeal VssDeal { get; set; } = encryptedDeal;
+
+        // Signature over the whole message
+        public byte[] Signature { get; set; } = [];
+
+        // GetBytes returns a binary representation of this deal, which is the
+        // message signed in a dkg deal.
+        public byte[] GetBytes()
         {
-            _rng = RandomNumberGenerator.Create();
+            MemoryStream stream = new();
+            MarshalBinary(stream);
+            return stream.ToArray();
         }
 
-        public override bool CanRead => true;
-
-        public override bool CanSeek => false;
-
-        public override bool CanWrite => false;
-
-        public override long Length => throw new NotSupportedException();
-
-        public override long Position
+        public void MarshalBinary(Stream s)
         {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
-        }
-
-        public override void Flush()
-        {
-            throw new NotSupportedException();
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var data = new byte[count];
-            _rng.GetBytes(data);
-            Array.Copy(data, 0, buffer, offset, count);
-            return count;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
+            BinaryWriter bw = new(s);
+            bw.Write(Index);
+            VssDeal.MarshalBinary(s);
         }
     }
 }

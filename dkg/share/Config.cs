@@ -25,7 +25,7 @@
 
 using dkg.group;
 
-namespace dkg
+namespace dkg.share
 {
     // Config holds all required information to run a fresh DKG protocol or a
     // resharing protocol. In the case of a new fresh DKG protocol, one must fill

@@ -23,11 +23,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg;
+using dkg.util;
 using dkg.group;
 using dkg.poly;
-using Org.BouncyCastle.Utilities;
-using System;
 
 namespace dkg.vss
 {
@@ -66,10 +64,10 @@ namespace dkg.vss
             T = t;
 
             var f = new PriPoly(Suite.G, T, Secret);
-            PublicKey = Suite.G.Point().Base().Mul(LongTermKey);
+            PublicKey = Suite.G.Base().Mul(LongTermKey);
 
             // Compute public polynomial coefficients
-            var F = f.Commit(Suite.G.Point().Base());
+            var F = f.Commit(Suite.G.Base());
             //SecretCommits = [.. F.Commits];
 
             SessionId = VssTools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
@@ -104,7 +102,7 @@ namespace dkg.vss
             IPoint vPub = VssTools.GetPub(Verifiers, i) ?? throw new Exception("EncryptedDeal: verifier index is out of range");
             // gen ephemeral key
             var dhSecret = Suite.G.Scalar();
-            var dhPublic = Suite.G.Point().Base().Mul(dhSecret);
+            var dhPublic = Suite.G.Base().Mul(dhSecret);
             // signs the public key
             var dhPublicBuff = dhPublic.GetBytes();
             var signature = Schnorr.Sign(Suite.G, Suite.Hash, LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
@@ -152,7 +150,7 @@ namespace dkg.vss
             {
                 return null;
             }
-            return Suite.G.Point().Base().Mul(Secret);
+            return Suite.G.Base().Mul(Secret);
         }
 
 

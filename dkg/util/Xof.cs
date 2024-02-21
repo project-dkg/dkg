@@ -25,14 +25,14 @@
 
 using Org.BouncyCastle.Crypto.Digests;
 
-namespace dkg
+namespace dkg.util
 {
-    public class XOFHelper
+    public class XOF
     {
         private const int _keySize = 128;
         private const int _digestSize = 256;
         private readonly ShakeDigest shake = new(_digestSize);
-        public byte[] XOF(byte[] data)
+        public byte[] CreateHash(byte[] data)
         {
             shake.BlockUpdate(data, 0, data.Length);
             var result = new byte[_keySize];

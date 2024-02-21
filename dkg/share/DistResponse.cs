@@ -23,60 +23,29 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
+using dkg.vss;
 
-namespace dkg.util
+namespace dkg.share
 {
-    // Class RandomStream implements a view random number generator as a stream
-    public class RandomStream : Stream
+    // Response holds the Response from another participant as well as the index of
+    // the target Dealer.
+    public class DistResponse(int index, Response vssResponse)
     {
-        private RandomNumberGenerator _rng;
+        // Index of the Dealer for which this response is for
+        public int Index { get; set; } = index;
 
-        public RandomStream()
-        {
-            _rng = RandomNumberGenerator.Create();
-        }
+        // Response issued from another participant
+        public Response VssResponse { get; set; } = vssResponse;
+    }
 
-        public override bool CanRead => true;
+    // Justification holds the Justification from a Dealer as well as the index of
+    // the Dealer in question.
+    public class DistJustification(int index, Justification vssJustification)
+    {
+        // Index of the Dealer who answered with this Justification
+        public int Index { get; set; } = index;
 
-        public override bool CanSeek => false;
-
-        public override bool CanWrite => false;
-
-        public override long Length => throw new NotSupportedException();
-
-        public override long Position
-        {
-            get => throw new NotSupportedException();
-            set => throw new NotSupportedException();
-        }
-
-        public override void Flush()
-        {
-            throw new NotSupportedException();
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            var data = new byte[count];
-            _rng.GetBytes(data);
-            Array.Copy(data, 0, buffer, offset, count);
-            return count;
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void SetLength(long value)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            throw new NotSupportedException();
-        }
+        // Justification issued from the Dealer
+        public Justification VssJustification { get; set; } = vssJustification;
     }
 }
