@@ -98,8 +98,8 @@ namespace dkg.vss
                 return ComplaintCode.IndexOutOfBound;
 
             // Compute fi * G
-            var fig = Suite.G.Point().Base().Mul(fi.V);
-            var commitPoly = new PubPoly(Suite.G, Suite.G.Point().Base(), d.Commitments);
+            var fig = Suite.G.Base().Mul(fi.V);
+            var commitPoly = new PubPoly(Suite.G, Suite.G.Base(), d.Commitments);
 
             var pubShare = commitPoly.Eval(fi.I);
             if (!fig.Equals(pubShare.V))

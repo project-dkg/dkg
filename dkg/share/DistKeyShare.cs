@@ -66,7 +66,7 @@ namespace dkg
         public DistKeyShare Renew(DistKeyShare g)
         {
             // Check G(0) = 0*G.
-            if (!g.Public().Equals(Suite.G.Point().Base().Mul(Suite.G.Scalar().Zero())))
+            if (!g.Public().Equals(Suite.G.Base().Mul(Suite.G.Scalar().Zero())))
             {
                 throw new DkgError("Wrong renewal function", GetType().Name);
             }

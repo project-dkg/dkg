@@ -33,7 +33,7 @@ namespace SchnorrTests
         private (IScalar prv, IPoint pub) KeyPair()
         {
             var prv = Suite.G.Scalar();
-            var pub = Suite.G.Point().Base().Mul(prv);
+            var pub = Suite.G.Base().Mul(prv);
             return (prv, pub);
         }
 

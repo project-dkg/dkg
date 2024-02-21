@@ -28,12 +28,16 @@
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Math.EC;
+using System.Security.Cryptography;
+
+using ECPoint = Org.BouncyCastle.Math.EC.ECPoint;
+using ECCurve = Org.BouncyCastle.Math.EC.ECCurve;
 
 namespace dkg.group
 {
     public class Secp256k1Scalar : IScalar, IEquatable<Secp256k1Scalar>
     {
-        private BigInteger _value;
+        public BigInteger _value;
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
         private static readonly BigInteger _order = _ecP.N;
         private static readonly int _length = (_order.BitLength + 7) / 8;
@@ -125,6 +129,14 @@ namespace dkg.group
             return new Secp256k1Scalar(_value.Subtract(other2._value).Mod(_order));
         }
 
+        public IScalar Mod(IScalar s2)
+        {
+            if (s2 is not Secp256k1Scalar other2)
+                throw new InvalidCastException("s2 is not a Secp256k1Scalar");
+
+            return new Secp256k1Scalar(_value.Mod(other2._value).Mod(_order));
+        }
+
         public IScalar Neg()
         {
             return new Secp256k1Scalar(_value.Negate().Mod(_order));
@@ -210,7 +222,7 @@ namespace dkg.group
 
     public class Secp256k1Point : IPoint, IEquatable<Secp256k1Point>
     {
-        private ECPoint _point;
+        public ECPoint _point;
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
         private static readonly ECCurve _curve = _ecP.Curve;
 
@@ -321,6 +333,12 @@ namespace dkg.group
             return new Secp256k1Point(resultPoint);
         }
 
+        internal Secp256k1Point Mul(BigInteger i)
+        {
+            ECPoint resultPoint = _point.Multiply(i);
+            return new Secp256k1Point(resultPoint);
+        }
+
         public void MarshalBinary(Stream s)
         {
             byte[] bytes = _point.GetEncoded(true); // true for compressed form
@@ -343,12 +361,48 @@ namespace dkg.group
         {
             return _point.GetEncoded(true); // true for compressed form
         }
+
+        public bool IsInSubgroup()
+        {
+            // Multiply the point by the order of the subgroup
+            ECPoint result = _point.Multiply(_ecP.N);
+
+            // Check if the result is the point at infinity
+            return result.IsInfinity;
+        }
+
+        public byte[] ExtractData()
+        {
+            // Normalize the point to ensure that the coordinates are in the correct form
+            _point = _point.Normalize();
+
+            // Convert the x-coordinate to a byte array
+            byte[] data = _point.AffineXCoord.ToBigInteger().ToByteArray();
+
+            // Extract the data length from the first byte
+            int dataLength = data[0];
+
+            // Check if the data length is valid
+            if (dataLength < 1 || dataLength > Secp256k1Group.SEmbedLen())
+            {
+                throw new ArgumentException("Invalid data length");
+            }
+
+            // Create a byte array to hold the message
+            byte[] message = new byte[dataLength];
+
+            // Copy the message from the data array
+            Buffer.BlockCopy(data, 1, message, 0, dataLength);
+
+            return message;
+        }
+
     }
 
     public class Secp256k1Group : IGroup, IEquatable<Secp256k1Group>
     {
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
-        private static readonly ECCurve _curve = _ecP.Curve;
+        private static readonly Org.BouncyCastle.Math.EC.ECCurve _curve = _ecP.Curve;
 
         private readonly RandomStream _strm = new();
         public override bool Equals(object? obj)
@@ -373,9 +427,13 @@ namespace dkg.group
         {
             return $"Secp256k1 Group: Order = {_ecP.N}, Scalar Length = {ScalarLen()}, Point Length = {PointLen()}";
         }
-        public int ScalarLen()
+        public static int SScalarLen()
         {
             return new Secp256k1Scalar().GetLength();
+        }
+        public int ScalarLen()
+        {
+            return SScalarLen();
         }
 
         public IScalar Scalar()
@@ -393,9 +451,91 @@ namespace dkg.group
             return new Secp256k1Point().Pick(_strm);
         }
 
+        public IPoint Base()
+        {
+            return new Secp256k1Point().Base();
+        }
         public RandomStream RndStream()
         {
             return _strm;
+        }
+
+        // Return number of bytes that can be embedded into points on this curve.
+        public static int SEmbedLen()
+        {
+            // Reserve at least 8 most-significant bits for randomness,
+            // and the least-significant 8 bits for embedded data length.
+            // (Hopefully it's unlikely we'll need >=2048-bit curves soon.)
+            return (SScalarLen() - 1 - 1);
+        }
+
+        public int EmbedLen()
+        {
+            return SEmbedLen();
+        }
+
+        public IPoint EmbedData(byte[] message)
+        {
+            // Check if the message is null or empty
+            if (message == null || message.Length == 0)
+            {
+                throw new ArgumentException(nameof(message), "EmbedMessage: Message cannot be null or empty");
+            }
+
+            int dataLength = Math.Min(message.Length, EmbedLen());
+
+            // Create a byte array to hold the length byte and the message
+            byte[] data = new byte[ScalarLen()];
+
+            // Store the message length in the first byte
+            data[0] = (byte)dataLength;
+
+
+            BigInteger x = BigInteger.Zero, y = BigInteger.Zero;
+
+            const int maxIterations = 256; // Maximum number of iterations
+            int iterations = 0; // Current number of iterations
+
+            while (iterations < maxIterations)
+            {
+                // Fill with random data
+                _strm.Read(data, 0, data.Length);
+                // Store the message length in the first byte
+                data[0] = (byte)dataLength;
+                // Copy the message into the rest of the array
+                Buffer.BlockCopy(message, 0, data, 1, dataLength);
+
+                // Convert the data to a BigInteger
+                x = new BigInteger(1, data);
+
+                ECFieldElement rhs = _ecP.Curve.FromBigInteger(x).Square().Add(_ecP.Curve.A).Multiply(_ecP.Curve.FromBigInteger(x)).Add(_ecP.Curve.B);
+                if (rhs.Sqrt() != null)
+                {
+                    y = rhs.Sqrt().ToBigInteger();
+                    break;
+                }
+
+                iterations++;
+            }
+
+            // If the maximum number of iterations has been reached, throw an exception
+            if (iterations >= maxIterations)
+            {
+                throw new InvalidOperationException("EmbedMessage: Could not find valid point to store a message");
+            }
+
+            // Create a point with these coordinates
+            ECPoint point = _ecP.Curve.CreatePoint(x, y);
+            Secp256k1Point res = new(point);
+
+            // Ensure the point is in the correct subgroup
+            if (!res.IsInSubgroup())
+            {
+                res = res.Mul(_ecP.Curve.Cofactor);
+            }
+
+            return res;
+
         }
     }
 }

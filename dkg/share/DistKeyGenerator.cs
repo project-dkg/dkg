@@ -106,7 +106,7 @@ namespace dkg.share
             {
                 throw new DkgError("LongTermKey cannot be null", GetType().Name);
             }
-            IPoint pub = Suite.G.Point().Base().Mul(c.LongTermKey);
+            IPoint pub = Suite.G.Base().Mul(c.LongTermKey);
 
             int oidx, nidx;
             // findPub method is not defined in your provided code. You need to ensure this method is defined in your project.
@@ -161,14 +161,14 @@ namespace dkg.share
                 }
                 else if (c.PublicCoeffs.Length != 0)
                 {
-                    dpub = new PubPoly(Suite.G, Suite.G.Point().Base(), c.PublicCoeffs);
+                    dpub = new PubPoly(Suite.G, Suite.G.Base(), c.PublicCoeffs);
 
                 }
                 else if (c.Share != null)
                 {
                     // take the commits of the share, no need to duplicate information
                     c.PublicCoeffs = c.Share.Commits;
-                    dpub = new PubPoly(Suite.G, Suite.G.Point().Base(), c.PublicCoeffs);
+                    dpub = new PubPoly(Suite.G, Suite.G.Base(), c.PublicCoeffs);
                 }
                 // oldThreshold is only useful in the context of a new share holder, to make sure there are enough correct deals from the old nodes.
                 canReceive = true;
@@ -752,7 +752,7 @@ namespace dkg.share
                 var s = deal.SecShare.V;
                 sh = sh.Add(s);
                 // Dist. public key = sum of all revealed commitments
-                var poly = new PubPoly(Suite.G, Suite.G.Point().Base(), deal.Commitments);
+                var poly = new PubPoly(Suite.G, Suite.G.Base(), deal.Commitments);
                 if (pub == null)
                 {
                     // first polynomial we see (instead of generating n empty commits)

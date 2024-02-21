@@ -339,7 +339,7 @@ namespace ShamirAndPolyTests
             int t = n / 2 + 1;
 
             var priPoly = new PriPoly(g, t, null);
-            var pubPoly = priPoly.Commit(g.Point().Base());
+            var pubPoly = priPoly.Commit(g.Base());
             var pubShares = pubPoly.Shares(n);
 
             var selected = pubShares.Skip(n - t).ToArray();

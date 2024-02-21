@@ -43,10 +43,10 @@ namespace dkg.poly
     public class PubPoly(IGroup group, IPoint basePoint, IPoint[] cmt) : IEquatable<PubPoly>
     {
         private readonly IGroup g = group; // Cryptographic group
-        private readonly IPoint b = basePoint ?? group.Point().Base(); // Base point, null for standard base
+        private readonly IPoint b = basePoint ?? group.Base(); // Base point, null for standard base
         public IPoint[] Commits { get; } = cmt; // Commitments to coefficients of the secret sharing polynomial
 
-        public PubPoly(IGroup group, IPoint[] cmt) : this(group, group.Point().Base(), cmt)
+        public PubPoly(IGroup group, IPoint[] cmt) : this(group, group.Base(), cmt)
         {
         }
         public override bool Equals(object? obj)

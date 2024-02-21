@@ -24,20 +24,6 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg.group;
-using dkg.poly;
-using Google.Protobuf.Collections;
-using Newtonsoft.Json;
-using Org.BouncyCastle.Pqc.Crypto.Lms;
-using Org.BouncyCastle.Tls.Crypto;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Drawing;
-using System.Net;
-using System.Runtime.Intrinsics.X86;
-using static NUnit.Framework.Constraints.Tolerance;
-
 namespace DkgTests
 {
     internal class TestDkgPedersen
@@ -258,7 +244,7 @@ namespace DkgTests
             var secretCoeffs = poly!.Coeffs;
             Assert.That(secretCoeffs[0], Is.EqualTo(secret));
 
-            var commitSecret = _g.Point().Base().Mul(secret);
+            var commitSecret = _g.Base().Mul(secret);
             Assert.That(commitSecret, Is.EqualTo(dkss[0].Public()));
         }
 
@@ -365,9 +351,12 @@ namespace DkgTests
 
             foreach (var dkg in thrDKGs.Values)
             {
-                Assert.That(dkg.QUAL(), Has.Count.EqualTo(newTotal));
-                Assert.That(dkg.ThresholdCertified(), Is.True);
-                Assert.That(dkg.Certified(), Is.False);
+                Assert.Multiple(() =>
+                {
+                    Assert.That(dkg.QUAL(), Has.Count.EqualTo(newTotal));
+                    Assert.That(dkg.ThresholdCertified(), Is.True);
+                    Assert.That(dkg.Certified(), Is.False);
+                });
                 var qualShares = dkg.QualifiedShares();
                 foreach (var dkg2 in thrDKGs.Values)
                 {
@@ -1442,7 +1431,7 @@ namespace DkgTests
         private (IScalar prv, IPoint pub) KeyPair()
         {
             var prv = _g.Scalar();
-            var pub = _g.Point().Base().Mul(prv);
+            var pub = _g.Base().Mul(prv);
             return (prv, pub);
         }
 
