@@ -535,7 +535,6 @@ namespace dkg.group
             }
 
             return res;
-
         }
     }
 }

@@ -27,7 +27,7 @@ using System.Text;
 
 namespace ECElGamalTests
 {
-    public class ECElGamalEncryptionTests
+    internal class ECElGamalEncryptionTests
     {
         private IScalar _privateKey;
         private IPoint _publicKey;
@@ -78,7 +78,7 @@ namespace ECElGamalTests
         {
             // Create a ciphertext with invalid type
             (IPoint C1, IPoint C2) cipher = (_g.Base(), _g.Base());
-            Assert.Throws<ArgumentException>(()=>ECElGamalEncryption.DecryptString(_g, _privateKey, cipher));
+            Assert.Throws<ArgumentException>(()=>ECElGamalEncryption.DecryptData(_g, _privateKey, cipher));
         }
     }
 }
