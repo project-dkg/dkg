@@ -1,0 +1,270 @@
+﻿
+// https://github.com/dedis/kyber/blob/master/share/dkg/pedersen/dkg.go
+
+using dkg;
+using dkg.group;
+using dkg.share;
+
+using DkgNodeApi;
+using Google.Protobuf;
+using Grpc.Core;
+using static DkgNodeApi.DkgNode;
+
+namespace GrpcServer
+{
+    class DkgNodeConfig
+    {
+        public int Port;
+        public string Host = "localhost";
+        public string Name() { return $"{{Dkg node {Host}:{Port}}}"; }
+    }
+    class DkgNodeWrapper
+    {
+        internal int Index { get; set; }
+        internal int Port { get; set; }
+        internal string Host { get; set; }
+        internal Server GRpcServer { get; set; }
+        internal DkgNodeImpl DkgNode { get; set; }
+        internal string Name() { return DkgNode.Name; }
+        internal IPoint PublicKey() { return DkgNode.PublicKey; }
+        internal IScalar PrivateKey() { return DkgNode.PrivateKey; }
+        internal DkgNodeConfig[] Configs { get; set; } = [];
+        internal Channel[] Channels = [];
+        internal DkgNodeClient[] Clients = [];
+
+        // Это те публичныке ключи, которые удалось собрать
+        // (на  случай, если какие-то узлы не запущены/не доступны делаем Dictionary)
+        internal Dictionary<int, IPoint> PublicKeys = [];
+
+        internal Thread TheThread { get; set; }
+        internal bool IsRunning = true;
+        internal IGroup G;
+
+        public DkgNodeWrapper (DkgNodeConfig[] configs, int index)
+        {
+            G = new Secp256k1Group();
+
+            Index = index;
+            Configs = configs;
+            Port = configs[index].Port;
+            Host = configs[index].Host;
+            DkgNode = new DkgNodeImpl(configs[index].Name(), G);
+
+            GRpcServer = new Server
+            {
+                Services = { BindService(DkgNode) },
+                Ports = { new ServerPort(Host, Port, ServerCredentials.Insecure) }
+            };
+
+            // Основная логика узла, вернее её прототип
+            TheThread = new Thread(() =>
+            {
+                Channels = new Channel[Configs.Length];
+                Clients = new DkgNodeClient[Configs.Length];
+                for (int j = 0; j < Configs.Length; j++)
+                {
+                    Channels[j] = new($"{Configs[j].Host}:{Configs[j].Port}", ChannelCredentials.Insecure);
+                    Clients[j] = new DkgNodeClient(Channels[j]);
+                }
+
+                Console.WriteLine($"{Name()} worker thread is up");
+
+                PublicKeys = new Dictionary<int, IPoint>(Configs.Length);
+
+                // 1. Собираем публичные ключи со всех узлов
+                for (int j = 0; j < Configs.Length; j++)
+                {
+                    if (Index == j)
+                    {
+                        PublicKeys.Add(Index, PublicKey());
+                    }
+                    else
+                    {
+                        byte[] pkb = [];
+                        var pk = Clients[j].GetPublicKey(new PublicKeyRequest());
+                        if (pk != null)
+                            pkb = pk.Data.ToByteArray();
+                        if (pkb.Length != 0)
+                        {
+                            PublicKeys.Add(j, G.Point().SetBytes(pkb));
+                            //Console.WriteLine($"Got public key of node {j} at node {Index}: {PublicKeys[j]}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Failed to get public key of node {j} at node {Index}");
+                        }
+                    }
+                }
+                Thread.Sleep(1000);
+                // 2. Создаём генератор/обработчик распределённого ключа для этого узла
+                Dictionary<int, DistDeal>? deals = null;
+                try
+                {
+                    DkgNode.Dkg = DistKeyGenerator.CreateDistKeyGenerator(G, PrivateKey(), [.. PublicKeys.Values], PublicKeys.Count) ??
+                          throw new Exception($"Could not create distributed key generator/handler for node {Index}");
+                    deals = DkgNode.Dkg.GetDistDeals() ??
+                            throw new Exception($"Could not get a list of deals for node {Index}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"FATAL ERROR FOR NODE {Index}: {ex.Message}");
+                    IsRunning = false;
+                }
+
+                if (IsRunning)
+                {
+                    List<DistResponse> responses = new List<DistResponse>(deals!.Count);
+                    foreach (var deal in deals!)
+                    {
+                        int i = deal.Key;
+                        int j = PublicKeys.Keys.ElementAt(i);
+                        Console.WriteLine($"Querying from {Index} to process for node {i} @{j}");
+
+                        byte[] db = deal.Value.GetBytes();
+                        byte[] rspb = [];
+                        var rb = Clients[j].ProcessDeal(new ProcessDealRequest { Data = ByteString.CopyFrom(db) });
+                        if (rb != null)
+                            rspb = rb.Data.ToByteArray();
+                        if (rspb.Length != 0)
+                        {
+                            DistResponse response = new();
+                            response.SetBytes(rspb);
+                            responses.Add(response);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Failed to get response from node {j} at node {Index}");
+                        }
+                    }
+
+                    foreach (var response in responses!)
+                    {
+                        DkgNode.Dkg!.ProcessResponse(response);
+                    }
+
+                    string certified = DkgNode.Dkg!.Certified() ? "" : "not ";
+                    Console.WriteLine($"Node at {Index} is {certified} certified");
+
+                }
+
+                while (IsRunning)
+                {
+                    Thread.Sleep(10);
+                }
+
+                Console.WriteLine($"Terminating node {Index}");
+                for (int j = 0; j < Configs.Length; j++)
+                {
+                    Channels[j].ShutdownAsync().Wait();
+                }
+
+                // Console.WriteLine($"{Name()} worker thread is down");
+            });
+
+        }
+
+        public void Start()
+        {
+
+            GRpcServer.Start();
+            TheThread.Start();
+        }
+
+        public void Shutdown()
+        {
+            GRpcServer.ShutdownAsync().Wait();
+            // Console.WriteLine($"{Name()} gRPC server has been stopped");
+            IsRunning = false;
+        }
+
+    }
+
+    class DkgNodeImpl : DkgNodeBase
+    {
+        internal string Name;
+        internal IScalar PrivateKey { get; set; }
+        internal IPoint PublicKey { get; set; }
+
+        public DistKeyGenerator? Dkg = null;
+
+        internal readonly object lockobject = new() { };
+
+        public DkgNodeImpl(string name, IGroup G)
+        {
+            Name = name;
+            PrivateKey = G.Scalar();
+            PublicKey = G.Base().Mul(PrivateKey);
+        }
+        public override Task<PublicKeyResponse> GetPublicKey(PublicKeyRequest _, ServerCallContext context)
+        {
+            PublicKeyResponse resp = new() { Data = ByteString.CopyFrom(PublicKey.GetBytes()) };
+            return Task.FromResult(resp);
+        }
+
+        public override Task<ProcessDealResponse> ProcessDeal(ProcessDealRequest deal, ServerCallContext context)
+        {
+            ProcessDealResponse resp;
+            
+            DistDeal distDeal = new();
+            distDeal.SetBytes(deal.Data.ToByteArray());
+
+            lock (lockobject)   
+            // Защищаем Dkg от параллельной обработки наскольких запросов
+            {
+                ByteString data = ByteString.CopyFrom([]);
+                if (Dkg != null)
+                {
+                    try
+                    {
+                        DistResponse distResp = Dkg.ProcessDeal(distDeal);
+                        data = ByteString.CopyFrom(distResp.GetBytes());
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"{Name}: {ex.Message}");
+                    }
+                }
+
+                resp = new ProcessDealResponse { Data = data };
+            }
+            return Task.FromResult(resp);
+        }
+    }
+
+    public class Program
+    {
+        const int nDkgNodes = 7;
+        const int BasePort = 50051;
+
+        public static void Main(string[] args)
+        {
+            DkgNodeConfig[] dkgConfigs = new DkgNodeConfig[nDkgNodes];
+
+            for (int i = 0; i < nDkgNodes; i++)
+            {
+                dkgConfigs[i] = new DkgNodeConfig() { Port = BasePort + i };
+            }
+
+            DkgNodeWrapper[] dkgNodes = new DkgNodeWrapper[nDkgNodes];
+            for (int i = 0; i < nDkgNodes; i++)
+            {
+                dkgNodes[i] = new DkgNodeWrapper(dkgConfigs, i);
+            }
+
+            for (int i = 0; i < nDkgNodes; i++)
+            {
+                dkgNodes[i].Start();
+            }
+
+            Console.WriteLine("Press any key to finish...");
+            Console.ReadKey();
+            Console.WriteLine("");
+
+            for (int i = 0; i < nDkgNodes; i++)
+            {
+                dkgNodes[i].Shutdown();
+            }
+
+        }
+    }
+}
