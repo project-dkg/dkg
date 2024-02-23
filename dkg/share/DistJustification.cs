@@ -23,14 +23,18 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
-using dkg.group;
+using dkg.vss;
 
-namespace dkg
+namespace dkg.share
 {
-    public static class Suite
+    // Justification holds the Justification from a Dealer as well as the index of
+    // the Dealer in question.
+    public class DistJustification(int index, Justification vssJustification)
     {
-        public static readonly IGroup G = new Secp256k1Group();
-        public static readonly HashAlgorithm HHash = SHA256.Create();
+        // Index of the Dealer who answered with this Justification
+        public int Index { get; set; } = index;
+
+        // Justification issued from the Dealer
+        public Justification VssJustification { get; set; } = vssJustification;
     }
 }

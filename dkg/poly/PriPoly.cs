@@ -31,7 +31,6 @@
 // scheme allows a committer to commit to a secret sharing polynomial so that
 // a verifier can check the claimed evaluations of the committed polynomial.
 
-using System;
 using System.Runtime.CompilerServices;
 using dkg.group;
 
@@ -43,7 +42,7 @@ namespace dkg.poly
     // PriPoly represents a secret sharing polynomial.
     public class PriPoly: IEquatable<PriPoly>
     {
-        private IGroup g; // Cryptographic group
+        private IGroup _g; // Cryptographic group
         public IScalar[] Coeffs { get; } // Coefficients of the polynomial
 
         // Сreates a new secret sharing polynomial using the provided
@@ -52,7 +51,7 @@ namespace dkg.poly
         // stream rand.
         public PriPoly(IGroup group, int t, IScalar? s)
         {
-            g = group;
+            _g = group;
             Coeffs = new IScalar[t];
             Coeffs[0] = s ?? group.Scalar();
             for (int i = 1; i < t; i++)
@@ -63,7 +62,7 @@ namespace dkg.poly
 
         public PriPoly(IGroup group, IScalar[] coeffs)
         {
-            g = group;
+            _g = group;
             Coeffs = coeffs;
         }
 
@@ -84,7 +83,7 @@ namespace dkg.poly
             if (ReferenceEquals(this, q))
                 return true;
 
-            if (g != q.g)
+            if (_g != q._g)
                 return false;
 
             if (Coeffs.Length != q.Coeffs.Length)
@@ -104,7 +103,7 @@ namespace dkg.poly
             unchecked // Overflow is fine, just wrap
             {
                 int hash = 17;
-                hash += g.GetHashCode();
+                hash += _g.GetHashCode();
                 foreach (var coeff in Coeffs)
                 {
                     hash = hash * 23 + coeff.GetHashCode();
@@ -134,8 +133,8 @@ namespace dkg.poly
         // Eval computes the private share v = p(i).
         public PriShare Eval(int i)
         {
-            var xi = g.Scalar().SetInt64(1 + i);
-            var v = g.Scalar().Zero();
+            var xi = _g.Scalar().SetInt64(1 + i);
+            var v = _g.Scalar().Zero();
             for (int j = Threshold() - 1; j >= 0; j--)
             {
                 v = v.Mul(xi);
@@ -159,7 +158,7 @@ namespace dkg.poly
         // as a new polynomial.
         public PriPoly Add(PriPoly q)
         {
-            if (g != q.g)
+            if (_g != q._g)
             {
                 throw new ArgumentException("PriPoly.Add: Non-matching groups");
             }
@@ -172,14 +171,14 @@ namespace dkg.poly
             {
                 newCoeffs[i] = Coeffs[i].Add(q.Coeffs[i]);
             }
-            return new PriPoly(g, newCoeffs);
+            return new PriPoly(_g, newCoeffs);
         }
 
         // Commit creates a public commitment polynomial for the given base point b or
         // the standard base if b == nil.
         public PubPoly Commit()
         {
-            return Commit(g.Base());
+            return Commit(_g.Base());
         }
          public PubPoly Commit(IPoint b)
         {
@@ -188,7 +187,7 @@ namespace dkg.poly
             {
                 commits[i] = b.Mul(Coeffs[i]);
             }
-            return new PubPoly(g, b, [.. commits]);
+            return new PubPoly(_g, b, [.. commits]);
         }
 
         // Mul multiples p and q together. The result is a polynomial of the sum of
@@ -202,7 +201,7 @@ namespace dkg.poly
             var newCoeffs = new IScalar[newDegree + 1];
             for (int i = 0; i <= newDegree; i++)
             {
-                newCoeffs[i] = g.Scalar().Zero();
+                newCoeffs[i] = _g.Scalar().Zero();
             }
             for (int i = 0; i < Coeffs.Length; i++)
             {
@@ -212,7 +211,7 @@ namespace dkg.poly
                     newCoeffs[i + j] = newCoeffs[i + j].Add(tmp);
                 }
             }
-            return new PriPoly(g, newCoeffs);
+            return new PriPoly(_g, newCoeffs);
         }
 
         // RecoverSecret reconstructs the shared secret p(0) from a list of private

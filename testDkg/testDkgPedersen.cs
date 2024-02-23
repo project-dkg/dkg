@@ -23,6 +23,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using NUnit.Framework;
+
 namespace DkgTests
 {
     internal class TestDkgPedersen
@@ -31,6 +33,8 @@ namespace DkgTests
         private static int _defaultT => VssTools.MinimumT(_defaultN);
 
         private IGroup _g = Suite.G;
+        private HashAlgorithm _hash = System.Security.Cryptography.SHA256.Create();
+
 
         RandomStream _randomStream;
         BinaryReader _randomReader;
@@ -49,7 +53,7 @@ namespace DkgTests
 
             var longSec = partSec[0];
 
-            var dkg = DistKeyGenerator.CreateDistKeyGenerator(longSec, partPubs, _defaultT);
+            var dkg = DistKeyGenerator.CreateDistKeyGenerator(_hash, longSec, partPubs, _defaultT);
             Assert.That(dkg, Is.Not.Null);
             Assert.Multiple(() =>
             {
@@ -64,9 +68,9 @@ namespace DkgTests
             });
 
             var (sec, _) = KeyPair();
-            Assert.Throws<DkgError>(() => DistKeyGenerator.CreateDistKeyGenerator(sec, partPubs, _defaultT));
+            Assert.Throws<DkgError>(() => DistKeyGenerator.CreateDistKeyGenerator(_hash, sec, partPubs, _defaultT));
             IPoint[] empty = [];
-            Assert.Throws<DkgError>(() => DistKeyGenerator.CreateDistKeyGenerator(sec, empty, _defaultT));
+            Assert.Throws<DkgError>(() => DistKeyGenerator.CreateDistKeyGenerator(_hash, sec, empty, _defaultT));
         }
 
         [Test]
@@ -74,7 +78,7 @@ namespace DkgTests
         {
             var (_, _, dkgs) = Generate(_defaultN, _defaultT);
             var dkg = dkgs[0];
-            var deals = dkg.Deals();     // No exception
+            var deals = dkg.GetDistDeals();     // No exception
             Assert.That(deals, Is.Not.Null);
 
             var rec = dkgs[1];
@@ -111,10 +115,10 @@ namespace DkgTests
             deal.Index = goodIdx;
 
             // wrong deal
-            var goodSig = deal.VssDeal.Signature;
-            deal.VssDeal.Signature = _randomReader.ReadBytes(goodSig.Length);
+            var goodSig = deal.EncDeal.Signature;
+            deal.EncDeal.Signature = _randomReader.ReadBytes(goodSig.Length);
             Assert.Throws<DkgError>(() => rec.ProcessDeal(deal));
-            deal.VssDeal.Signature = goodSig;
+            deal.EncDeal.Signature = goodSig;
         }
 
         [Test]
@@ -133,12 +137,12 @@ namespace DkgTests
             // give a wrong deal
             var goodSecret = deal.SecShare.V;
             deal.SecShare.V = _g.Scalar().Zero();
-            var dd = dkg.Deals();
+            var dd = dkg.GetDistDeals();
             var encD = dd[idxRec];
             var resp = rec.ProcessDeal(encD);
             Assert.That(resp.VssResponse.Status, Is.EqualTo(ResponseStatus.Complaint));
             deal.SecShare.V = goodSecret;
-            dd = dkg.Deals();
+            dd = dkg.GetDistDeals();
             encD = dd[idxRec];
 
             // no verifier tied to Response
@@ -162,7 +166,7 @@ namespace DkgTests
             var deal21 = dkg2.Dealer.PlaintextDeal(1);
             var goodRnd21 = deal21.SecShare.V;
             deal21.SecShare.V = _g.Scalar().Zero();
-            var deals2 = dkg2.Deals();
+            var deals2 = dkg2.GetDistDeals();
 
             var resp12 = rec.ProcessDeal(deals2[idxRec]);
             Assert.Multiple(() =>
@@ -174,7 +178,7 @@ namespace DkgTests
             });
 
             deal21.SecShare.V = goodRnd21;
-            deals2 = dkg2.Deals();
+            deals2 = dkg2.GetDistDeals();
 
             // give it to the first peer
             // process dealer 2's deal
@@ -267,7 +271,7 @@ namespace DkgTests
 
             for (var i = 0; i < n; i++)
             {
-                var dkg = DistKeyGenerator.CreateDistKeyGenerator(privates[i], publics, newTotal);
+                var dkg = DistKeyGenerator.CreateDistKeyGenerator(_hash, privates[i], publics, newTotal);
                 dkgs[i] = dkg;
             }
 
@@ -291,7 +295,7 @@ namespace DkgTests
             var resps = new List<DistResponse>();
             foreach (var dkg in thrDKGs.Values)
             {
-                var deals = dkg.Deals();
+                var deals = dkg.GetDistDeals();
                 foreach (var kvp in deals)
                 {
                     // give the deal anyway - simpler
@@ -401,7 +405,7 @@ namespace DkgTests
             var newDkgs = new DistKeyGenerator[newN];
             for (var i = 0; i < dkgs.Length; i++)
             {
-                var c = new Config()
+                var c = new Config(_hash)
                 {
                     LongTermKey = dkgs[i].C.LongTermKey,
                     OldNodes = publics,
@@ -415,7 +419,7 @@ namespace DkgTests
                 newDkgs[i] = new DistKeyGenerator(c);
             }
             newDkgs[dkgs.Length] = new DistKeyGenerator(
-                new Config()
+                new Config(_hash)
                 {
                     LongTermKey = newPriv,
                     OldNodes = publics,
@@ -452,7 +456,7 @@ namespace DkgTests
                 {
                     continue;
                 }
-                var localDeals = dkg.Deals();
+                var localDeals = dkg.GetDistDeals();
                 deals.Add(localDeals);
             }
 
@@ -563,7 +567,7 @@ namespace DkgTests
             var newDkgs = new DistKeyGenerator[dkgs.Length];
             for (var i = 0; i < dkgs.Length; i++)
             {
-                var c = new Config()
+                var c = new Config(_hash)
                 {
                     LongTermKey = secrets[i], 
                     NewNodes = publics,
@@ -627,7 +631,7 @@ namespace DkgTests
             var newDkgs = new DistKeyGenerator[dkgs.Length];
             for (int i = 0; i < dkgs.Length; i++)
             {
-                var c = new Config
+                var c = new Config(_hash)
                 {
                     LongTermKey = secrets[i],
                     OldNodes = publics,
@@ -726,7 +730,7 @@ namespace DkgTests
             var newDkgs = new DistKeyGenerator[newN];
             for (int i = 0; i < oldN; i++)
             {
-                var c = new Config
+                var c = new Config(_hash)
                 {
                     LongTermKey = oldPrivs[i],
                     OldNodes = oldPubs,
@@ -755,7 +759,7 @@ namespace DkgTests
 
             for (int i = 0; i < newN; i++)
             {
-                var c = new Config
+                var c = new Config(_hash)
                 {
                     LongTermKey = newPrivs[i],
                     OldNodes = oldPubs,
@@ -803,7 +807,7 @@ namespace DkgTests
             {
                 try
                 {
-                    var localDeals = dkg.Deals();
+                    var localDeals = dkg.GetDistDeals();
                     deals.Add(localDeals);
                 }
                 catch (DkgError ex)
@@ -973,7 +977,7 @@ namespace DkgTests
             var oldDkgs = new DistKeyGenerator[oldN];
             for (int i = 0; i < oldN; i++)
             {
-                var c = new Config
+                var c = new Config(_hash)
                 {
                     LongTermKey = oldPrivs[i],
                     OldNodes = oldPubs,
@@ -1022,7 +1026,7 @@ namespace DkgTests
 
             for (int i = 2; i < newN; i++)
             {
-                var c = new Config
+                var c = new Config(_hash)
                 {
                     LongTermKey = newPrivs[i],
                     OldNodes = oldPubs,
@@ -1057,7 +1061,7 @@ namespace DkgTests
             {
                 try
                 {
-                    var localDeals = oldDkgs[i].Deals();
+                    var localDeals = oldDkgs[i].GetDistDeals();
                     Assert.That(localDeals, Has.Count.EqualTo(newN));
                     deals[i] = localDeals;
                     if (oldDkgs[i].CanReceive && oldDkgs[i].Nidx <= 1)
@@ -1241,7 +1245,7 @@ namespace DkgTests
             var totalDkgs = new DistKeyGenerator[total];
             for (var i = 0; i < oldN; i++)
             {
-                var c = new Config
+                var c = new Config(_hash)
                 {
                     LongTermKey = oldPrivs[i],
                     OldNodes = oldPubs,
@@ -1279,7 +1283,7 @@ namespace DkgTests
             for (var i = oldN; i < total; i++)
             {
                 var newIdx = i - oldN + newOffset;
-                var c = new Config
+                var c = new Config(_hash)
                 {
                     LongTermKey = newPrivs[newIdx],
                     OldNodes = oldPubs,
@@ -1313,7 +1317,7 @@ namespace DkgTests
 
             foreach (var dkg in oldDkgs)
             {
-                var localDeals = dkg.Deals();
+                var localDeals = dkg.GetDistDeals();
                 Assert.That(localDeals, Is.Not.Null);
                 deals.Add(localDeals);
 
@@ -1447,7 +1451,7 @@ namespace DkgTests
             DistKeyGenerator[] dkgs = new DistKeyGenerator[n];
             for (int i = 0; i < n; i++)
             {
-                var dkg = DistKeyGenerator.CreateDistKeyGenerator(partSec[i], partPubs, t);
+                var dkg = DistKeyGenerator.CreateDistKeyGenerator(_hash, partSec[i], partPubs, t);
                 dkgs[i] = dkg;
             }
             return (partPubs, partSec, dkgs);
@@ -1461,7 +1465,7 @@ namespace DkgTests
             var resps = new List<DistResponse>();
             foreach (var dkg in dkgs)
             {
-                var deals = dkg.Deals();
+                var deals = dkg.GetDistDeals();
                 foreach (var kvp in deals)
                 {
                     var d = kvp.Value;

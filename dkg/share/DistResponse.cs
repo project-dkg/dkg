@@ -37,15 +37,4 @@ namespace dkg.share
         // Response issued from another participant
         public Response VssResponse { get; set; } = vssResponse;
     }
-
-    // Justification holds the Justification from a Dealer as well as the index of
-    // the Dealer in question.
-    public class DistJustification(int index, Justification vssJustification)
-    {
-        // Index of the Dealer who answered with this Justification
-        public int Index { get; set; } = index;
-
-        // Justification issued from the Dealer
-        public Justification VssJustification { get; set; } = vssJustification;
-    }
 }

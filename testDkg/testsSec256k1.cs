@@ -24,7 +24,6 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 using System.Text;
-using static Google.Protobuf.Reflection.FeatureSet.Types;
 
 namespace Secp256k1Tests
 {
@@ -257,6 +256,17 @@ namespace Secp256k1Tests
             point2 = _point.Add(point2);
             // point - point + point = point
             Assert.That(_point, Is.EqualTo(point2));
+        }
+
+        [Test]
+        public void TestGetSetBytes()
+        {
+            _point.Pick(new RandomStream());
+            byte[] bytes = _point.GetBytes();
+            Secp256k1Point point2 = new(); 
+            point2.Pick(new RandomStream());
+            point2.SetBytes(bytes);
+            Assert.That(_point.Equals(point2));
         }
 
         [Test]

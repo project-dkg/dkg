@@ -24,11 +24,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg;
 using dkg.group;
 using dkg.poly;
-using Org.BouncyCastle.Utilities;
-using System;
 
 namespace dkg.vss
 {
@@ -65,7 +62,11 @@ namespace dkg.vss
             MarshalBinary(stream);
             return stream.ToArray();
         }
-
+        public void SetBytes(byte[] bytes)
+        {
+            MemoryStream stream = new(bytes);
+            UnmarshalBinary(stream);
+        }
         public void MarshalBinary(Stream s)
         {
             BinaryWriter bw = new(s);
@@ -148,48 +149,6 @@ namespace dkg.vss
                 }
                 return hash;
             }
-        }
-    }
-
-    // EncryptedDeal contains the deal in a encrypted form only decipherable by the
-    // correct recipient. The encryption is performed in a similar manner as what is
-    // done in TLS. The dealer generates a temporary key pair, signs it with its
-    // longterm secret key.
-    public class EncryptedDeal(byte[] dhKey, byte[] signatire, byte[] nounce, byte[] cipher, byte[] tag)
-    {
-        // Ephemeral Diffie Hellman key
-        public byte[] DHKey { get; set; } = dhKey;
-
-        // Signature of the DH key by the longterm key of the dealer
-        public byte[] Signature { get; set; } = signatire;
-
-        // Nonce used for the encryption
-        public byte[] Nonce { get; set; } = nounce;
-
-        // AEAD encryption of the marshalled deal 
-        public byte[] Cipher { get; set; } = cipher;
-        public byte[] Tag { get; set; } = tag;
-
-        public byte[] GetBytes()
-        {
-            MemoryStream stream = new();
-            MarshalBinary(stream);
-            return stream.ToArray();
-        }
-
-        public void MarshalBinary(Stream s)
-        {
-            BinaryWriter bw = new(s);
-            bw.Write(DHKey.Length);
-            bw.Write(DHKey);
-            bw.Write(Signature.Length);
-            bw.Write(Signature);
-            bw.Write(Nonce.Length);
-            bw.Write(Nonce);
-            bw.Write(Cipher.Length);
-            bw.Write(Cipher);
-            bw.Write(Tag.Length);
-            bw.Write(Tag);
         }
     }
 }

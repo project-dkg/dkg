@@ -23,53 +23,60 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using System.Runtime.CompilerServices;
+
+using HashAlgorithm = System.Security.Cryptography.HashAlgorithm;
+
 using dkg.group;
 using dkg.poly;
 using dkg.util;
 using dkg.vss;
 
+[assembly: InternalsVisibleTo("testDkg")]
+
 namespace dkg.share
 {
-    // DistKeyGenerator is ableto drive the DKG protocol.
+    // DistKeyGenerator is able to drive the DKG protocol.
     public class DistKeyGenerator
     {
+        internal HashAlgorithm Hash { get; }
         // config driving the behavior of DistKeyGenerator
-        public Config C { get; set; }
+        internal Config C { get; set; }
 
         // long-term private key
-        public IScalar LongTermKey { get; set; }
+        internal IScalar LongTermKey { get; set; }
         // long-term public key
-        public IPoint Pub { get; set; }
+        internal IPoint Pub { get; set; }
         // distributed public key
-        public PubPoly Dpub { get; set; }
+        internal PubPoly Dpub { get; set; }
         // dealer used to distribute shares
-        public Dealer Dealer { get; set; }
+        internal Dealer Dealer { get; set; }
         // verifiers indexed by dealer index
-        public Dictionary<int, Verifier> Verifiers { get; set; }
+        internal Dictionary<int, Verifier> Verifiers { get; set; }
         // performs the part of the response verification for old nodes
-        public Dictionary<int, Aggregator> OldAggregators { get; set; }
+        internal Dictionary<int, Aggregator> OldAggregators { get; set; }
         // index in the old list of nodes
-        public int Oidx { get; set; }
+        internal int Oidx { get; set; }
         // index in the new list of nodes
-        public int Nidx { get; set; }
+        internal int Nidx { get; set; }
         // old threshold used in the previous DKG
-        public int OldT { get; set; }
+        internal int OldT { get; set; }
         // new threshold to use in this round
-        public int NewT { get; set; }
+        internal int NewT { get; set; }
         // indicates whether we are in the re-sharing protocol or basic DKG
-        public bool IsResharing { get; set; }
+        internal bool IsResharing { get; set; }
         // indicates whether we are able to issue shares or not
-        public bool CanIssue { get; set; }
+        internal bool CanIssue { get; set; }
         // Indicates whether we are able to receive a new share or not
-        public bool CanReceive { get; set; }
+        internal bool CanReceive { get; set; }
         // indicates whether the node holding the pub key is present in the new list
-        public bool NewPresent { get; set; }
+        internal bool NewPresent { get; set; }
         // indicates whether the node is present in the old list
-        public bool OldPresent { get; set; }
+        internal bool OldPresent { get; set; }
         // already processed our own deal
-        public bool Processed { get; set; }
+        internal bool Processed { get; set; }
         // did the timeout / period / already occured or not
-        public bool Timeout { get; set; }
+        internal bool Timeout { get; set; }
 
         // Takes a Config and returns a DistKeyGenerator that is able
         // to drive the DKG or resharing protocol.
@@ -80,6 +87,8 @@ namespace dkg.share
             {
                 throw new DkgError("Can't run with empty node list", GetType().Name);
             }
+
+            Hash = c.Hash;
 
             bool isResharing = false;
             // Check if resharing is required
@@ -110,7 +119,6 @@ namespace dkg.share
             IPoint pub = Suite.G.Base().Mul(c.LongTermKey);
 
             int oidx, nidx;
-            // findPub method is not defined in your provided code. You need to ensure this method is defined in your project.
             oidx = VssTools.FindPubIdx(c.OldNodes, pub);
             nidx = VssTools.FindPubIdx(c.NewNodes, pub);
             bool oldPresent = oidx != -1,
@@ -131,14 +139,14 @@ namespace dkg.share
             {
                 // resharing case
                 IScalar secretCoeff = c.Share.Share.V;
-                dealer = new Dealer(c.LongTermKey, secretCoeff, c.NewNodes, newThreshold);
+                dealer = new Dealer(Hash, c.LongTermKey, secretCoeff, c.NewNodes, newThreshold);
                 canIssue = true;
             }
             else if (!isResharing && newPresent)
             {
                 // fresh DKG case
                 IScalar secretCoeff = Suite.G.Scalar();
-                dealer = new Dealer(c.LongTermKey, secretCoeff, c.NewNodes, newThreshold);
+                dealer = new Dealer(Hash, c.LongTermKey, secretCoeff, c.NewNodes, newThreshold);
                 canIssue = true;
                 c.OldNodes = c.NewNodes;
                 oidx = VssTools.FindPubIdx(c.OldNodes, pub);
@@ -206,9 +214,9 @@ namespace dkg.share
 
         // CreateDistKeyGenerator returns a dist key generator ready to create a fresh
         // distributed key with the regular DKG protocol.
-        public static DistKeyGenerator CreateDistKeyGenerator(IScalar longterm, IPoint[] participants, int t)
+        public static DistKeyGenerator CreateDistKeyGenerator(HashAlgorithm hash, IScalar longterm, IPoint[] participants, int t)
         {
-            var c = new Config()
+            var c = new Config(hash)
             {
                 LongTermKey = longterm,
                 NewNodes = participants,
@@ -231,7 +239,7 @@ namespace dkg.share
                     throw new DkgError("Duplicate public key in NewNodes list", GetType().Name);
                 }
                 alreadyTaken[pub.ToString()!] = true;
-                Verifier ver = new(C.LongTermKey!, pub, verifierList);
+                Verifier ver = new(Hash, C.LongTermKey!, pub, verifierList);
                 // set that the number of approval for this deal must be at the given threshold regarding the new nodes. (see config)
                 ver.SetThreshold(C.Threshold);
                 verifiers[i] = ver;
@@ -239,7 +247,7 @@ namespace dkg.share
             Verifiers = verifiers;
         }
 
-        // Deals returns all the deals that must be broadcasted to all participants in
+        // GetDistDeals returns all the deals that must be broadcasted to all participants in
         // the new list. The deal corresponding to this DKG is already added to this DKG
         // and is ommitted from the returned map. To know which participant a deal
         // belongs to, loop over the keys as indices in the list of new participants:
@@ -251,7 +259,7 @@ namespace dkg.share
         // If this method cannot process its own Deal, that indicates a
         // severe problem with the configuration or implementation and
         // results in a panic.
-        public Dictionary<int, DistDeal> Deals()
+        public Dictionary<int, DistDeal> GetDistDeals()
         {
             Dictionary<int, DistDeal> dd = [];
             if (CanIssue)
@@ -275,11 +283,9 @@ namespace dkg.share
                     DistDeal distd = new(Oidx, deals[i]);
 
                     // sign the deal
-                    byte[] buff;
                     try
                     {
-                        buff = distd.GetBytes();
-                        distd.Signature = Schnorr.Sign(Suite.G, Suite.Hash, LongTermKey, buff);
+                        distd.Signature = Schnorr.Sign(Suite.G, Hash, LongTermKey, distd.GetBytesForSignature());
                     }
                     catch (Exception e)
                     {
@@ -309,7 +315,7 @@ namespace dkg.share
             return dd;
         }
 
-        // ProcessDeal takes a Deal created by Deals() and stores and verifies it. It
+        // ProcessDeal takes a Deal created by GetDistDeals() and stores and verifies it. It
         // returns a Response to broadcast to every other participant, including the old
         // participants. It returns an error in case the deal has already been stored,
         // or if the deal is incorrect (see vss.Verifier.ProcessEncryptedDeal).
@@ -323,11 +329,9 @@ namespace dkg.share
                                          throw new DkgError("dkg: dist deal out of bounds index", GetType().Name);
 
             // verify signature
-            byte[] buff;
             try
             {
-                buff = dd.GetBytes();
-                Schnorr.Verify(Suite.G, Suite.Hash, pub, buff, dd.Signature);//!!!
+                Schnorr.Verify(Suite.G, Hash, pub, dd.GetBytesForSignature(), dd.Signature);
             }
             catch (Exception e)
             {
@@ -341,7 +345,7 @@ namespace dkg.share
             Response? resp;
             try
             {
-                resp = ver.ProcessEncryptedDeal(dd.VssDeal);
+                resp = ver.ProcessEncryptedDeal(dd.EncDeal);
             }
             catch (Exception e)
             {
@@ -349,7 +353,7 @@ namespace dkg.share
             }
 
             if (resp == null)
-                throw new DkgError(ver.LastProcessingError ?? "Unknow error", GetType().Name);
+                throw new DkgError(ver.LastProcessingError ?? "Unknown error", GetType().Name);
 
             Func<DistResponse> reject = () =>
             {
@@ -367,7 +371,7 @@ namespace dkg.share
                 byte[] s;
                 try
                 {
-                    s = Schnorr.Sign(Suite.G, Suite.Hash, LongTermKey, resp.Hash());
+                    s = Schnorr.Sign(Suite.G, Hash, LongTermKey, resp.GetBytesForSignature());
                 }
                 catch (Exception e)
                 {
@@ -468,7 +472,7 @@ namespace dkg.share
             OldAggregators.TryGetValue(resp.Index, out Aggregator? agg);
             if (agg == null)
             {
-                agg = new Aggregator(C.NewNodes);
+                agg = new Aggregator(Hash, C.NewNodes);
                 OldAggregators[resp.Index] = agg;
             }
             string? err = null;
@@ -503,10 +507,7 @@ namespace dkg.share
 
             return new DistJustification(
                 Oidx,
-                new Justification(
-                    Dealer.SessionId,
-                    resp.VssResponse.Index, // good index because of signature check
-                    deal));
+                new Justification(Dealer.SessionId, resp.VssResponse.Index, deal));
 
         }
         // ProcessJustification takes a justification and validates it. It returns an

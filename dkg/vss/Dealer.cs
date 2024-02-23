@@ -27,13 +27,15 @@ using dkg.util;
 using dkg.group;
 using dkg.poly;
 
+using HashAlgorithm = System.Security.Cryptography.HashAlgorithm;
+
 namespace dkg.vss
 {
     // Dealer encapsulates for creating and distributing the shares and for
     // replying to any Responses.
     public class Dealer
     {
-
+        private HashAlgorithm Hash { get; }
         public IScalar LongTermKey { get; set; }
         public IPoint PublicKey { get; set; }
         public IScalar Secret { get; set; }
@@ -51,13 +53,13 @@ namespace dkg.vss
         // a middle ground between robustness and secrecy. Increasing t will increase
         // the secrecy at the cost of the decreased robustness and vice versa. It 
         // returns an error if the t is inferior or equal to 2.
-        public Dealer(IScalar longterm, IScalar secret, IPoint[] verifiers, int t)
+        public Dealer(HashAlgorithm hash, IScalar longterm, IScalar secret, IPoint[] verifiers, int t)
         {
             if (!VssTools.ValidT(t, verifiers))
             {
-                throw new ArgumentException($"Dealer: t {t} invalid");
+                throw new ArgumentException($"Dealer: Threshold value {t} is invalid");
             }
-
+            Hash = hash;
             LongTermKey = longterm;
             Secret = secret;
             Verifiers = verifiers;
@@ -68,11 +70,10 @@ namespace dkg.vss
 
             // Compute public polynomial coefficients
             var F = f.Commit(Suite.G.Base());
-            //SecretCommits = [.. F.Commits];
 
-            SessionId = VssTools.CreateSessionId(PublicKey, Verifiers, F.Commits, T);
+            SessionId = VssTools.CreateSessionId(Hash, PublicKey, Verifiers, F.Commits, T);
 
-            Aggregator = new Aggregator(PublicKey, Verifiers, F.Commits, T, SessionId);
+            Aggregator = new Aggregator(Hash, PublicKey, Verifiers, F.Commits, T, SessionId);
             // C = F + G
             Deals = new Deal[Verifiers.Length];
             for (int i = 0; i < Verifiers.Length; i++)
@@ -80,7 +81,7 @@ namespace dkg.vss
                 var fi = f.Eval(i);
                 Deals[i] = new Deal(SessionId, fi, F.Commits, T);
             }
-            HkdfContext = DhHelper.Context(Suite.Hash, PublicKey, Verifiers);
+            HkdfContext = DhHelper.Context(Hash, PublicKey, Verifiers);
             SecretPoly = f;
         }
 
@@ -105,7 +106,7 @@ namespace dkg.vss
             var dhPublic = Suite.G.Base().Mul(dhSecret);
             // signs the public key
             var dhPublicBuff = dhPublic.GetBytes();
-            var signature = Schnorr.Sign(Suite.G, Suite.Hash, LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
+            var signature = Schnorr.Sign(Suite.G, Hash, LongTermKey, dhPublicBuff) ?? throw new Exception("EncryptedDeal: error signing the public key");
 
             // AES128-GCM
             var pre = DhHelper.DhExchange(dhSecret, vPub);
@@ -135,7 +136,7 @@ namespace dkg.vss
 
         // SetTimeout marks the end of a round, invalidating any missing (or future) response
         // for this DKG protocol round. The caller is expected to call this after a long timeout
-        // so each DKG node can still compute its share if enough Deals are valid.
+        // so each DKG node can still compute its share if enough GetDistDeals are valid.
         public void SetTimeout()
         {
             Aggregator.Timeout = true;
@@ -165,12 +166,12 @@ namespace dkg.vss
                 return null;
 
             var j = new Justification(SessionId, r.Index, Deals[r.Index]);
-            j.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, j.Hash());
+            j.Signature = Schnorr.Sign(Suite.G, Hash,  LongTermKey, j.GetBytesForSignature());
             return j;
         }
         // RecoverSecret recovers the secret shared by a Dealer by gathering at least t
-        // Deals from the verifiers. It returns an error if there is not enough Deals or
-        // if all Deals don't have the same SessionID.
+        // GetDistDeals from the verifiers. It returns an error if there is not enough GetDistDeals or
+        // if all GetDistDeals don't have the same SessionID.
         public static IScalar RecoverSecret(Deal[] deals, int n, int t)
         {
             PriShare[] shares = new PriShare[deals.Length];

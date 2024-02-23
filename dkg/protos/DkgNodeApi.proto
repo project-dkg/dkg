@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package DkgNodeApi;
+
+service DkgNode {
+  rpc GetPublicKey (PublicKeyRequest) returns (PublicKeyResponse) {}
+  rpc ProcessDeal (ProcessDealRequest) returns (ProcessDealResponse) {}
+}
+
+message PublicKeyRequest {
+}
+
+message PublicKeyResponse {
+  bytes data = 1;
+}
+
+message ProcessDealRequest {
+  bytes data = 1;
+}
+
+message ProcessDealResponse {
+  optional bytes data = 1;
+}

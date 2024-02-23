@@ -23,8 +23,6 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
-
 namespace ShareTests
 {
     internal class ShareComparerTests
@@ -121,7 +119,7 @@ namespace ShareTests
         {
             _scalar = new Secp256k1Scalar().One();
             _priShare = new PriShare(5, _scalar);
-            _hashAlgorithm = Suite.Hash;
+            _hashAlgorithm = System.Security.Cryptography.SHA256.Create(); ;
         }
 
         [Test]
@@ -196,7 +194,7 @@ namespace ShareTests
         {
             _point = new Secp256k1Point().Base();
             _pubShare = new PubShare(7, _point);
-            _hashAlgorithm = Suite.Hash;
+            _hashAlgorithm = System.Security.Cryptography.SHA256.Create(); 
         }
 
         [Test]

@@ -30,3 +30,5 @@ global using dkg.poly;
 global using dkg.vss;
 global using dkg.share;
 global using dkg;
+
+global using HashAlgorithm = System.Security.Cryptography.HashAlgorithm;

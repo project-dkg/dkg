@@ -41,8 +41,9 @@ namespace AnEndToEndExample
     internal class ExampleEndtoEnd
     {
         [Test]
-        public void Test_Example_DKG()
+        public void EndToEndExample()
         {
+            HashAlgorithm hash = System.Security.Cryptography.SHA256.Create();
             // The number of nodes for this test
             int n = 7;
 
@@ -68,21 +69,21 @@ namespace AnEndToEndExample
             // 2. Create the DKGs on each node
             for (int i = 0; i < n; i++)
             {
-                var dkg = DistKeyGenerator.CreateDistKeyGenerator(nodes[i].PrivKey!, pubKeys, n);
+                var dkg = DistKeyGenerator.CreateDistKeyGenerator(hash, nodes[i].PrivKey!, pubKeys, n);
                 nodes[i].Dkg = dkg;
             }
 
-            // 3. Each node sends its Deals to the other nodes
+            // 3. Each node sends its deals to the other nodes
             foreach (var node in nodes)
             {
-                var deals = node.Dkg!.Deals();
+                var deals = node.Dkg!.GetDistDeals();
                 foreach (var deal in deals)
                 {
                     nodes[deal.Key].Deals!.Add(deal.Value);
                 }
             }
 
-            // 4. Process the Deals on each node and send the responses to the other nodes
+            // 4. Process the deals on each node and send the responses to the other nodes
             for (int i = 0; i < n; i++)
             {
                 foreach (var deal in nodes[i].Deals!)
@@ -240,7 +241,7 @@ namespace AnEndToEndExample
             foreach (var node in nodes)
             {
                 var share = node.Dkg!.DistKeyShare();
-                var c = new Config
+                var c = new Config(hash)
                 {
                     LongTermKey = node.PrivKey,
                     OldNodes = pubKeys,

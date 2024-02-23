@@ -24,15 +24,25 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 
+using NUnit.Framework;
+
 namespace SchnorrTests
 {
     internal class SchnorrTests
     {
+        private IGroup _g;
+        private HashAlgorithm _hash;
         private (IScalar prv, IPoint pub) KeyPair()
         {
-            var prv = Suite.G.Scalar();
-            var pub = Suite.G.Base().Mul(prv);
+            var prv = _g.Scalar();
+            var pub = _g.Base().Mul(prv);
             return (prv, pub);
+        }
+        [SetUp]
+        public void Setup()
+        {
+            _g = Suite.G;
+            _hash = System.Security.Cryptography.SHA256.Create();
         }
 
         [Test]
@@ -42,14 +52,14 @@ namespace SchnorrTests
 
             var ( prv, pub ) = KeyPair();
 
-            var s = Schnorr.Sign(Suite.G, Suite.Hash, prv, msg);
+            var s = Schnorr.Sign(Suite.G, _hash, prv, msg);
             Assert.That(s, Is.Not.Null);
 
-            Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, s);
+            Schnorr.Verify(Suite.G, _hash, pub, msg, s);
             
             // wrong size
             var larger = s.Concat(new byte[] { 0x01, 0x02 }).ToArray();
-            Assert.Throws<DkgError>(() => Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, larger));
+            Assert.Throws<DkgError>(() => Schnorr.Verify(_g, _hash, pub, msg, larger));
 
             // wrong challenge
             var wrongEncoding = new byte[] { 243, 45, 180, 140, 73, 23, 41, 212, 250, 87, 157, 243,
@@ -58,17 +68,17 @@ namespace SchnorrTests
             var wrChall = new byte[s.Length];
             wrongEncoding.CopyTo(wrChall, 0);
             s.Skip(32).ToArray().CopyTo(wrChall, 32);
-            Assert.Throws<DkgError>(() => Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, wrChall));
+            Assert.Throws<DkgError>(() => Schnorr.Verify(_g, _hash, pub, msg, wrChall));
 
             // wrong response
             var wrResp = new byte[s.Length];
             s.Take(32).ToArray().CopyTo(wrResp, 0);
             wrongEncoding.CopyTo(wrResp, 32);
-            Assert.Throws<DkgError>(() => Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, wrResp));
+            Assert.Throws<DkgError>(() => Schnorr.Verify(_g, _hash, pub, msg, wrResp));
 
             // wrong public key
             (_, pub) = KeyPair();
-            Assert.Throws<DkgError>(() => Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, s));
+            Assert.Throws<DkgError>(() => Schnorr.Verify(_g, _hash, pub, msg, s));
         }
 
         [Test]
@@ -77,10 +87,10 @@ namespace SchnorrTests
             var msg = System.Text.Encoding.UTF8.GetBytes("Hello Schnorr");
             var (prv, pub) = KeyPair();
 
-            var s = Schnorr.Sign(Suite.G, Suite.Hash,prv, msg);
+            var s = Schnorr.Sign(_g, _hash,prv, msg);
             Assert.That(s, Is.Not.Null);
 
-            Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, s); // No exception 
+            Schnorr.Verify(_g, _hash, pub, msg, s); // No exception 
         }
 
         [Test]
@@ -95,10 +105,10 @@ namespace SchnorrTests
             var msg = System.Text.Encoding.UTF8.GetBytes("Hello Schnorr");
             var (prv, pub) = KeyPair();
 
-            var s = Schnorr.Sign(Suite.G, Suite.Hash, prv, msg);
+            var s = Schnorr.Sign(_g, _hash, prv, msg);
             Assert.That(s, Is.Not.Null);
 
-            Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, s);  // No exception
+            Schnorr.Verify(_g, _hash, pub, msg, s);  // No exception
 
             // Add l to signature
             for (var i = 0; i < 32; i++)
@@ -107,7 +117,7 @@ namespace SchnorrTests
                 s[32 + i] = (byte)c;
                 c >>= 8;
             }
-            Assert.Throws<DkgError>(() => Schnorr.Verify(Suite.G, Suite.Hash, pub, msg, s));
+            Assert.Throws<DkgError>(() => Schnorr.Verify(_g, _hash, pub, msg, s));
         }
     }
 }

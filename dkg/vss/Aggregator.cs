@@ -26,6 +26,7 @@
 using dkg.group;
 using dkg.poly;
 using dkg.util;
+using HashAlgorithm = System.Security.Cryptography.HashAlgorithm;
 
 namespace dkg.vss
 {
@@ -33,6 +34,7 @@ namespace dkg.vss
     // It brings common functionalities for both Dealer and Verifier structs.
     public class Aggregator
     {
+        internal HashAlgorithm Hash { get; }
         public IPoint DealerPublicKey { get; set; }
         public IPoint[] Verifiers { get; set; }
         public IPoint[] Commitments { get; set; }
@@ -45,8 +47,9 @@ namespace dkg.vss
 
         // New Aggregator returns a structure capable of storing Responses about a
         // deal and check if the deal is certified or not.
-        public Aggregator(IPoint dealer, IPoint[] verifiers, IPoint[] commitments, int t, byte[] sid)
+        public Aggregator(HashAlgorithm hash, IPoint dealer, IPoint[] verifiers, IPoint[] commitments, int t, byte[] sid)
         {
+            Hash = hash;
             DealerPublicKey = dealer;
             Verifiers = verifiers;
             Commitments = commitments;
@@ -55,8 +58,9 @@ namespace dkg.vss
             Responses = [];
         }
 
-        public Aggregator(IPoint[] verifiers)
+        public Aggregator(HashAlgorithm hash, IPoint[] verifiers)
         {
+            Hash = hash;
             SessionId = [];
             Responses = [];
             Commitments = [];
@@ -64,8 +68,6 @@ namespace dkg.vss
             Verifiers = verifiers;
             DealerPublicKey = Suite.G.Point();
         }
-
-        private static readonly Exception ErrDealAlreadyProcessed = new Exception();
 
         // VerifyDeal analyzes the deal and returns an error if it's incorrect. If 
         // inclusion is true, it also returns an error if it is the second time this struct 
@@ -127,7 +129,7 @@ namespace dkg.vss
 
             try
             {
-                Schnorr.Verify(Suite.G, Suite.Hash, pub, r.Hash(), r.Signature);
+                Schnorr.Verify(Suite.G, Hash, pub, r.GetBytesForSignature(), r.Signature);
             }
             catch (DkgError ex)
             {

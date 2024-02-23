@@ -24,12 +24,13 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 using dkg.group;
+using HashAlgorithm = System.Security.Cryptography.HashAlgorithm;
 
 namespace dkg.vss
 {
     public static class VssTools
     {
-        public static byte[] CreateSessionId(IPoint publicKey, IPoint[] verifiers, IPoint[] commitments, int t)
+        public static byte[] CreateSessionId(HashAlgorithm Hash, IPoint publicKey, IPoint[] verifiers, IPoint[] commitments, int t)
         {
             MemoryStream strm = new();
             publicKey.MarshalBinary(strm);
@@ -43,7 +44,7 @@ namespace dkg.vss
                 cmt.MarshalBinary(strm);
             }
             strm.Write(BitConverter.GetBytes((uint)t));
-            return Suite.Hash.ComputeHash(strm.ToArray());
+            return Hash.ComputeHash(strm.ToArray());
         }
 
         // MinimumT returns a safe value of T that balances secrecy and robustness.
@@ -53,7 +54,7 @@ namespace dkg.vss
         // it possible for an adversary to prevent recovery (robustness).
         public static int MinimumT(int n)
         {
-            return (n + 1) / 2;
+            return Math.Max((n + 1) / 2, 2);
         }
 
         public static bool ValidT(int t, IPoint[] verifiers)

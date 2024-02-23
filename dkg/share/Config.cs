@@ -24,6 +24,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 using dkg.group;
+using HashAlgorithm = System.Security.Cryptography.HashAlgorithm;
 
 namespace dkg.share
 {
@@ -38,6 +39,7 @@ namespace dkg.share
     // filled in.
     public class Config
     {
+        public HashAlgorithm Hash { get; }
         // Longterm is the LongTermKey secret key.
         public IScalar? LongTermKey { get; set; }
 
@@ -62,8 +64,9 @@ namespace dkg.share
         // configuration.
         public int OldThreshold { get; set; }
 
-        public Config() 
+        public Config(HashAlgorithm hash) 
         { 
+            Hash = hash;
             LongTermKey = null;
             OldNodes = [];
             PublicCoeffs = [];

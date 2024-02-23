@@ -23,6 +23,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg.group;
+
 namespace dkg.vss
 {
     public enum ResponseStatus
@@ -48,7 +50,7 @@ namespace dkg.vss
 
     // Response is sent by the verifiers to all participants and holds each
     // individual validation or refusal of a Deal.
-    public class Response(byte[] sessionId, int index)
+    public class Response : IMarshalling, IEquatable<Response>
     {
         static private Dictionary<ComplaintCode, string> complaintCodeToMessage = new Dictionary<ComplaintCode, string>()
         {
@@ -73,11 +75,23 @@ namespace dkg.vss
             }
         }
 
+        public Response()
+        {
+            SessionId = [];
+            Index = -1;
+
+        }
+        public Response(byte[] sessionId, int index)
+        {
+            SessionId = sessionId;
+            Index = index;
+        }
+
         // SessionId related to this run of the protocol
-        public byte[] SessionId { get; set; } = sessionId;
+        public byte[] SessionId { get; set; }
 
         // Index of the verifier issuing this Response from the new set of nodes
-        public int Index { get; set; } = index;
+        public int Index { get; set; }
 
         // Complain/Approval
         public ResponseStatus Status { get; set; } = ResponseStatus.Complaint;
@@ -86,7 +100,7 @@ namespace dkg.vss
         // Signature over the whole packet
         public byte[] Signature { get; set; } = [];
 
-        public byte[] Hash()
+        public byte[] GetBytesForSignature()
         {
             MemoryStream b = new();
             BinaryWriter w = new(b);
@@ -94,8 +108,75 @@ namespace dkg.vss
             w.Write(SessionId);
             w.Write(Index);
             w.Write(Status == ResponseStatus.Approval);
-            return Suite.Hash.ComputeHash(b.ToArray());
+            return b.ToArray();
+        }
+
+        public void MarshalBinary(Stream s)
+        {
+            BinaryWriter writer = new(s);
+            writer.Write(SessionId.Length);
+            writer.Write(SessionId);
+            writer.Write(Index);
+            writer.Write((int)Status);
+            writer.Write((int)Complaint);
+            writer.Write(Signature.Length);
+            writer.Write(Signature);
+        }
+
+        public int MarshalSize()
+        {
+            return sizeof(int) * 5 + SessionId.Length + Signature.Length;
+        }
+
+        public void UnmarshalBinary(Stream s)
+        {
+            BinaryReader reader = new(s);
+            int l = reader.ReadInt32();
+            SessionId = new byte[l];
+            SessionId = reader.ReadBytes(SessionId.Length);
+            Index = reader.ReadInt32();
+            Status = (ResponseStatus)reader.ReadInt32();
+            Complaint = (ComplaintCode)reader.ReadInt32();
+            l = reader.ReadInt32();
+            Signature = new byte[l];
+            Signature = reader.ReadBytes(Signature.Length);
+        }
+
+        public byte[] GetBytes()
+        {
+            MemoryStream ms = new MemoryStream();
+            MarshalBinary(ms);
+            return ms.ToArray();
+        }
+
+        public void SetBytes(byte[] data)
+        {
+            MemoryStream ms = new(data);
+            UnmarshalBinary(ms);
+        }
+
+        public bool Equals(Response? other)
+        {
+            if (other == null)
+                return false;
+
+            return SessionId.SequenceEqual(other.SessionId) &&
+                   Index == other.Index &&
+                   Status == other.Status &&
+                   Complaint == other.Complaint &&
+                   Signature.SequenceEqual(other.Signature);
+        }
+
+        public override bool Equals(object? obj)
+        {
+            return Equals(obj as Response);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(SessionId, Index, Status, Complaint, Signature);
         }
     }
-
 }
+
+

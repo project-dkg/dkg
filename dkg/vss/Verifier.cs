@@ -23,9 +23,12 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Runtime.CompilerServices;
 using dkg.group;
 using dkg.util;
+
+using HashAlgorithm = System.Security.Cryptography.HashAlgorithm;
+
+using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("testDkg")]
 
@@ -35,6 +38,7 @@ namespace dkg.vss
     // collaborate with other Verifiers to reconstruct a secret.
     public class Verifier
     {
+        internal HashAlgorithm Hash { get; }
         internal IScalar LongTermKey { get; }
         internal IPoint DealerKey { get; }
         internal IPoint PublicKey { get; }
@@ -52,8 +56,9 @@ namespace dkg.vss
         // The security parameter t of the secret sharing scheme is automatically set to
         // a default safe value. If a different t value is required, it is possible to set
         // it with `verifier.SetT()`.
-        public Verifier(IScalar longterm, IPoint dealerKey, IPoint[] verifiers)
+        public Verifier(HashAlgorithm hash, IScalar longterm, IPoint dealerKey, IPoint[] verifiers)
         {
+            Hash = hash;
             LastProcessingError = null;
             LongTermKey = longterm;
             DealerKey = dealerKey;
@@ -77,8 +82,8 @@ namespace dkg.vss
             }
 
             Index = index;
-            HkdfContext = DhHelper.Context(Suite.Hash, dealerKey, verifiers);
-            Aggregator = new Aggregator(verifiers);
+            HkdfContext = DhHelper.Context(Hash, dealerKey, verifiers);
+            Aggregator = new Aggregator(Hash, verifiers);
         }
 
         public Deal? DecryptDeal(EncryptedDeal encrypted)
@@ -87,7 +92,7 @@ namespace dkg.vss
             // verify signature
             try
             {
-                Schnorr.Verify(Suite.G, Suite.Hash, DealerKey, encrypted.DHKey, encrypted.Signature);
+                Schnorr.Verify(Suite.G, Hash, DealerKey, encrypted.DHKey, encrypted.Signature);
 
                 // compute shared key and AES526-GCM cipher
                 var dhKey = Suite.G.Point();
@@ -133,7 +138,7 @@ namespace dkg.vss
                     return null;
                 }
 
-                var sid = VssTools.CreateSessionId(DealerKey, Verifiers, d.Commitments, d.T);
+                var sid = VssTools.CreateSessionId(Hash, DealerKey, Verifiers, d.Commitments, d.T);
                 Response r = new(sid, Index)
                 {
                     Complaint = Aggregator.VerifyDeal(d, true)
@@ -152,7 +157,7 @@ namespace dkg.vss
 
 
 
-                r.Signature = Schnorr.Sign(Suite.G, Suite.Hash,  LongTermKey, r.Hash());
+                r.Signature = Schnorr.Sign(Suite.G, Hash,  LongTermKey, r.GetBytesForSignature());
                 LastProcessingError = Aggregator.AddResponse(r);
 
                 if (LastProcessingError != null) 

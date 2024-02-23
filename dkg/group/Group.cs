@@ -108,6 +108,9 @@ namespace dkg.group
         IPoint Mul(IScalar s);
         // Convert to byte array
         byte[] GetBytes();
+        // Set from to byte array
+        public IPoint SetBytes(byte[] bytes);
+
         // Extract embedded data
         public byte[] ExtractData();
 

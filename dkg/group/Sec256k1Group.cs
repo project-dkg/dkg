@@ -362,6 +362,12 @@ namespace dkg.group
             return _point.GetEncoded(true); // true for compressed form
         }
 
+        public IPoint SetBytes(byte[] bytes)
+        {
+            _point = _ecP.Curve.DecodePoint(bytes);
+            return this;
+        }
+
         public bool IsInSubgroup()
         {
             // Multiply the point by the order of the subgroup

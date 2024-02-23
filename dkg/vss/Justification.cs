@@ -39,7 +39,7 @@ namespace dkg.vss
         // Signature over the whole packet
         public byte[] Signature { get; set; } = [];
 
-        public byte[] Hash()
+        public byte[] GetBytesForSignature()
         {
             MemoryStream b = new();
             BinaryWriter w = new(b);
@@ -47,7 +47,7 @@ namespace dkg.vss
             w.Write(SessionId);
             w.Write(Index);
             Deal.MarshalBinary(b);
-            return Suite.Hash.ComputeHash(b.ToArray());
+            return b.ToArray();
         }
     }
 

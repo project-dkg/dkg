@@ -23,8 +23,6 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using dkg.util;
-
 namespace VssTests
 {
     internal class VssTests
@@ -34,6 +32,7 @@ namespace VssTests
         private int _goodT;
 
         private IGroup _g;
+        private HashAlgorithm  _hash;
         private IPoint _dealerPub;
         private IScalar _dealerSec;
         private IScalar _secret;
@@ -50,6 +49,8 @@ namespace VssTests
         public void Setup()
         {
             _g = Suite.G;
+            _hash = System.Security.Cryptography.SHA256.Create();
+
             (_dealerSec, _dealerPub) = KeyPair();
             (_secret, _) = KeyPair();
             _vssThreshold = VssTools.MinimumT(_nbVerifiers);
@@ -88,7 +89,7 @@ namespace VssTests
 
         private Dealer GenDealer()
         {
-            return new Dealer(_dealerSec, _secret, [ .._verifiersPub], _vssThreshold);
+            return new Dealer(_hash, _dealerSec, _secret, [ .._verifiersPub], _vssThreshold);
         }
 
         private (Dealer, List<Verifier>) GenAll()
@@ -97,7 +98,7 @@ namespace VssTests
             var verifiers = new List<Verifier>(_nbVerifiers);
             for (var i = 0; i < _nbVerifiers; i++)
             {
-                var v = new Verifier(_verifiersSec[i], _dealerPub, [.. _verifiersPub]);
+                var v = new Verifier(_hash, _verifiersSec[i], _dealerPub, [.. _verifiersPub]);
                 verifiers.Add(v);
             }
             return (dealer, verifiers);
@@ -163,14 +164,14 @@ namespace VssTests
         [Test]
         public void TestDealerNew()
         {
-            Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], _goodT);
+            Dealer dealer = new(_hash, _dealerSec, _secret, [.. _verifiersPub], _goodT);
 
             int[] badTs = [0, 1, -4];
             foreach (int badT in badTs)
             {
                 Assert.Throws<ArgumentException>(() =>
                     {
-                        Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], badT);
+                        Dealer dealer = new(_hash, _dealerSec, _secret, [.. _verifiersPub], badT);
                     });
             }
         }
@@ -180,12 +181,12 @@ namespace VssTests
         {
             Random Random = new();
             int randIdx = Random.Next(_verifiersPub.Count);
-            Verifier v = new(_verifiersSec[randIdx], _dealerPub, [.. _verifiersPub]);
+            Verifier v = new(_hash, _verifiersSec[randIdx], _dealerPub, [.. _verifiersPub]);
 
             IScalar wrongKey = _g.Scalar();
             Assert.Throws<ArgumentException>(() =>
             {
-                Verifier wrongVerifier = new(wrongKey, _dealerPub, [.. _verifiersPub]);
+                Verifier wrongVerifier = new(_hash, wrongKey, _dealerPub, [.. _verifiersPub]);
             });
         }
 
@@ -202,7 +203,7 @@ namespace VssTests
             Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Approval));
 
             var aggr = ver.Aggregator;
-            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
 
             for (int i = 1; i < aggr.T - 1; i++)
             {
@@ -229,7 +230,7 @@ namespace VssTests
             var dealer = GenDealer();
             var aggr = dealer.Aggregator;
 
-            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[0].Commitments], dealer.T);
 
             for (int i = 0; i < aggr.T; i++)
             {
@@ -327,7 +328,7 @@ namespace VssTests
             var d = dealer.Deals[randIdx];
 
             IPoint[] commitments = [.. dealer.Deals[0].Commitments];
-            byte[] sid = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.Not.Null);
 
             var encryptedDeal = dealer.EncryptedDeal(randIdx);
@@ -342,7 +343,7 @@ namespace VssTests
                 Assert.That(resp.Status, Is.EqualTo(ResponseStatus.Approval));
                 Assert.That(resp.Index, Is.EqualTo(verifier.Index));
                 Assert.That(resp.SessionId, Is.EqualTo(dealer.SessionId));
-                Schnorr.Verify(Suite.G, Suite.Hash, verifier.PublicKey, resp.Hash(), resp.Signature);
+                Schnorr.Verify(Suite.G, _hash, verifier.PublicKey, resp.GetBytesForSignature(), resp.Signature);
                 Assert.That(resp, Is.EqualTo(verifier.Responses()[verifier.Index]));
             });
 
@@ -477,7 +478,7 @@ namespace VssTests
             Assert.That(err, Is.Not.Null);
 
             v1.Responses().Remove(v2.Index);
-            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[v2.Index].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[v2.Index].Commitments], dealer.T);
             v1.Responses()[v2.Index] = new Response(sessionId, v2.Index) { Status = ResponseStatus.Approval };
             Assert.That(v1.ProcessResponse(resp2), Is.Not.Null);
         }
@@ -507,7 +508,7 @@ namespace VssTests
             Assert.That(r.Status, Is.EqualTo(ResponseStatus.Complaint));
 
             resp.Index = _verifiersPub.Count;
-            var sig = Schnorr.Sign(Suite.G, Suite.Hash,v.LongTermKey, resp.Hash());
+            var sig = Schnorr.Sign(Suite.G, _hash, v.LongTermKey, resp.GetBytesForSignature());
             resp.Signature = sig;
             Assert.That(aggr.VerifyResponse(resp), Is.Not.Null);
             resp.Index = 0;
@@ -531,14 +532,14 @@ namespace VssTests
 
             for (int i = 0; i < aggr.T; i++)
             {
-                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
             Assert.That(aggr.DealCertified(), Is.False);
 
             for (int i = aggr.T; i < _nbVerifiers; i++)
             {
-                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
 
@@ -557,7 +558,7 @@ namespace VssTests
 
             for (int i = 0; i < aggr.T; i++)
             {
-                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
             Assert.That(aggr.DealCertified(), Is.False);
@@ -590,7 +591,7 @@ namespace VssTests
             // Add T responses
             for (int i = 0; i < aggr.T; i++)
             {
-                var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
+                var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[i].Commitments], dealer.T);
                 aggr.Responses[i] = new Response(sessionId, i) { Status = ResponseStatus.Approval };
             }
             Assert.That(aggr.DealCertified(), Is.False);
@@ -666,7 +667,7 @@ namespace VssTests
             var aggr = dealer.Aggregator;
 
             var idx = 1;
-            var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[idx].Commitments], dealer.T);
+            var sessionId = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], [.. dealer.Deals[idx].Commitments], dealer.T);
             var c = new Response(sessionId, idx) { Status = ResponseStatus.Complaint };
             Assert.Multiple(() =>
             {
@@ -683,14 +684,14 @@ namespace VssTests
         {
             Dealer dealer = GenDealer();
             IPoint[] commitments = [.. dealer.Deals[0].Commitments];
-            byte[] sid = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.Not.Null);
 
-            byte[] sid2 = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid2 = VssTools.CreateSessionId(_hash, _dealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid, Is.EqualTo(sid2));
 
             IPoint wrongDealerPub = _dealerPub.Add(_dealerPub);
-            byte[] sid3 = VssTools.CreateSessionId(wrongDealerPub, [.. _verifiersPub], commitments, dealer.T);
+            byte[] sid3 = VssTools.CreateSessionId(_hash, wrongDealerPub, [.. _verifiersPub], commitments, dealer.T);
             Assert.That(sid3, Is.Not.Null);
             Assert.That(sid3, Is.Not.EqualTo(sid2));
         }
@@ -707,39 +708,8 @@ namespace VssTests
         [Test]
         public void TestContext()
         {
-            byte[] context = DhHelper.Context(Suite.Hash, _dealerPub, [.. _verifiersPub]);
-            Assert.That(context, Has.Length.EqualTo(Suite.Hash.HashSize / 8));
+            byte[] context = DhHelper.Context(_hash, _dealerPub, [.. _verifiersPub]);
+            Assert.That(context, Has.Length.EqualTo(_hash.HashSize / 8));
         }
-
-        [Test]
-        public void TestDealEquals()
-        {
-            Dealer dealer = GenDealer();
-            Deal d = new();
-
-            Assert.Multiple(() =>
-            {
-                Assert.That(dealer.Deals[0], Is.Not.EqualTo(null));
-                Assert.That(dealer.Deals[1], Is.Not.EqualTo(dealer.Deals[0]));
-                Assert.That(dealer.Deals[1], Is.Not.EqualTo(d));
-                Assert.That(dealer.Deals[1].GetHashCode(), Is.Not.EqualTo(dealer.Deals[0].GetHashCode()));
-                Assert.That(dealer.Deals[1].GetHashCode(), Is.Not.EqualTo(d.GetHashCode()));
-            });
-        }
-
-        [Test]
-        public void TestDealMarshaUnmarshal()
-        {
-            Dealer dealer = new(_dealerSec, _secret, [.. _verifiersPub], _goodT);
-            Deal d = new();
-
-            MemoryStream stream = new();
-            dealer.Deals[0].MarshalBinary(stream);
-            Assert.That(stream.Length, Is.EqualTo(dealer.Deals[0].MarshalSize()));
-            stream.Position = 0;
-            d.UnmarshalBinary(stream);
-            Assert.That(dealer.Deals[0], Is.EqualTo(d));
-        }
-
     }
 }
