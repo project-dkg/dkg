@@ -9,9 +9,6 @@ concurrency:
   group: '${{ github.workflow }}-${{ github.job }}-${{ github.head_ref || github.ref_name }}'
   cancel-in-progress: true
 
-env:
-  CODECOV_TOKEN: b7a8f65b-e427-4e6c-82cd-e5607bcfbe80
-
 jobs:
   build:
 
@@ -38,10 +35,3 @@ jobs:
 
     - name: Test
       run: dotnet test --no-restore --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
-
-    - name: Upload coverage reports to Codecov
-      if: matrix.os == 'ubuntu-latest'
-      uses: codecov/codecov-action@v4.0.1
-      env:
-        token: ${{ env.CODECOV_TOKEN }}
-        slug: maxirmx/dkg
