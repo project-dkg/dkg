@@ -1,3 +1,6 @@
+[![test](https://github.com/maxirmx/dkg/actions/workflows/test.yml/badge.svg)](https://github.com/maxirmx/dkg/actions/workflows/test.yml)
+[![CodeQL](https://github.com/maxirmx/dkg/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/maxirmx/dkg/actions/workflows/github-code-scanning/codeql)
+
 # Проект dkg
 
 Реализация на c# алгоритма распределённой генерации ключей (Pedersen 91) с пороговой схемой K из N (схема Шамира) на стандартных эллиптических кривых (Sec256k1 c возможностью замены)
