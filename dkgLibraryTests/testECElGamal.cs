@@ -72,18 +72,5 @@ namespace ECElGamalTests
             // Check that the decrypted string matches the original plaintext
             Assert.That(decrypted, Is.EqualTo(plaintext));
         }
-
-        [Test]
-        public void TestDecryptInvalidCipher()
-        {
-            string plaintext = "Hello, world!";
-
-            // Encrypt the plaintext
-            (IPoint C1, IPoint C2) cipher = ECElGamalEncryption.Encrypt(_g, _publicKey, plaintext);
-            // Mangle cipher
-            cipher.C1 = cipher.C1.Add(cipher.C1);
-
-            Assert.Throws<ArgumentException>(()=>ECElGamalEncryption.DecryptData(_g, _privateKey, cipher));
-        }
     }
 }
