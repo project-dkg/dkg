@@ -34,7 +34,7 @@
 using System.Runtime.CompilerServices;
 using dkg.group;
 
-[assembly: InternalsVisibleTo("testDkg")]
+[assembly: InternalsVisibleTo("dkgLibraryTests")]
 
 namespace dkg.poly
 {
@@ -43,7 +43,7 @@ namespace dkg.poly
     public class PriPoly: IEquatable<PriPoly>
     {
         private IGroup _g; // Cryptographic group
-        public IScalar[] Coeffs { get; } // Coefficients of the polynomial
+        internal IScalar[] Coeffs { get; } // Coefficients of the polynomial
 
         // Сreates a new secret sharing polynomial using the provided
         // cryptographic group, the secret sharing threshold t, and the secret to be

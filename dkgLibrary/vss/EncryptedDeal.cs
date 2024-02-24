@@ -35,14 +35,14 @@ namespace dkg.vss
     public class EncryptedDeal :IMarshalling, IEquatable<EncryptedDeal>
     {
         // Ephemeral Diffie Hellman key
-        public byte[] DHKey { get; set; }
+        internal byte[] DHKey { get; set; }
         // Signature of the DH key by the longterm key of the dealer
-        public byte[] Signature { get; set; }
+        internal byte[] Signature { get; set; }
         // Nonce used for the encryption
-        public byte[] Nonce { get; set; }
+        internal byte[] Nonce { get; set; }
         // AEAD encryption of the marshalled deal 
-        public byte[] Cipher { get; set; }
-        public byte[] Tag { get; set; }
+        internal byte[] Cipher { get; set; }
+        internal byte[] Tag { get; set; }
 
         public EncryptedDeal()
         {

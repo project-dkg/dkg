@@ -151,14 +151,14 @@ namespace AnEndToEndExample
         // public share. We then reconstruct the public commitment with those public
         // shares.
 
-            var partials = new List<IPoint>();
+            //var partials = new List<IPoint>();
             var pubShares = new List<PubShare>();
 
             for (int i = 0; i < n; i++)
             {
                 var S = cipher.C1.Mul(nodes[i].SecretShare!.V);
                 var partial = cipher.C2.Sub(S);
-                partials.Add(partial);
+                //partials.Add(partial);
 
                 var pubShare = new PubShare(i, partial);
                 pubShares.Add(pubShare);
@@ -213,7 +213,7 @@ namespace AnEndToEndExample
             var p = g.Scalar();
             var Q = g.Base().Mul(p);
 
-            partials = new List<IPoint>();
+            var partials = new List<IPoint>();
             pubShares = new List<PubShare>();
 
             for (int i = 0; i < n; i++)

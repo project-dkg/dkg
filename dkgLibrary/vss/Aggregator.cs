@@ -34,15 +34,15 @@ namespace dkg.vss
     public class Aggregator
     {
         internal IGroup G { get; }
-        public IPoint DealerPublicKey { get; set; }
-        public IPoint[] Verifiers { get; set; }
-        public IPoint[] Commitments { get; set; }
-        public Dictionary<int, Response> Responses { get; set; }
-        public byte[] SessionId { get; set; }
-        public Deal? Deal { get; set; }
-        public int T { get; set; }
-        public bool BadDealer { get; set; }
-        public bool Timeout { get; set; }
+        internal IPoint DealerPublicKey { get; }
+        internal IPoint[] Verifiers { get; set; }
+        internal IPoint[] Commitments { get; set; }
+        internal Dictionary<int, Response> Responses { get; set; }
+        internal byte[] SessionId { get; set; }
+        internal Deal? Deal { get; set; }
+        internal int T { get; set; }
+        internal bool BadDealer { get; set; }
+        internal bool Timeout { get; set; }
 
         // New Aggregator returns a structure capable of storing Responses about a
         // deal and check if the deal is certified or not.
@@ -162,10 +162,13 @@ namespace dkg.vss
         public string? AddResponse(Response r)
         {
             if (VssTools.GetPub(Verifiers, r.Index) == null)
-                return "AddResponse: index out of bounds";
+                return $"AddResponse: index {r.Index} out of bounds";
 
             if (Responses.ContainsKey(r.Index))
-                return "AddResponse: response from same origin already exists";
+                //    -- This is something that is not clear --
+                //    not an error and not clear how to prevent
+                //    return $"AddResponse: response from origin {r.Index} already exists";
+                return null;
 
             Responses[r.Index] = r;
             return null;

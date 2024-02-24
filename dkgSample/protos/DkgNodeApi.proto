@@ -3,22 +3,48 @@ syntax = "proto3";
 package DkgNodeApi;
 
 service DkgNode {
-  rpc GetPublicKey (PublicKeyRequest) returns (PublicKeyResponse) {}
-  rpc ProcessDeal (ProcessDealRequest) returns (ProcessDealResponse) {}
+  rpc GetPublicKey (PublicKeyRequest) returns (PublicKeyReply) {}
+  rpc ProcessDeal (ProcessDealRequest) returns (ProcessDealReply) {}
+  rpc ProcessResponse (ProcessResponseRequest) returns (ProcessResponseReply) {}
+  rpc SendMessage (SendMessageRequest) returns (SendMessageReply) {}
+  rpc PartialDecrypt (PartialDecryptRequest) returns (PartialDecryptReply) {}   
 }
 
 message PublicKeyRequest {
 }
 
-message PublicKeyResponse {
+message PublicKeyReply {
   bytes data = 1;
 }
 
 message ProcessDealRequest {
   bytes data = 1;
-  bytes stub = 2;
 }
 
-message ProcessDealResponse {
-  optional bytes data = 1;
+message ProcessDealReply {
+  bytes	data = 1;
+}
+
+message ProcessResponseRequest {
+  bytes data = 1;
+}
+
+message ProcessResponseReply {
+}
+
+message SendMessageRequest {
+  bytes C1 = 1;
+  bytes C2 = 2;
+}
+
+message SendMessageReply {
+}
+
+message PartialDecryptRequest {
+  bytes C1 = 1;
+  bytes C2 = 2;
+}
+
+message PartialDecryptReply {
+	optional bytes partial = 1;
 }

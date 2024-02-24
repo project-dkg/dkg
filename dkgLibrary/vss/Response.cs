@@ -88,17 +88,17 @@ namespace dkg.vss
         }
 
         // SessionId related to this run of the protocol
-        public byte[] SessionId { get; set; }
+        internal byte[] SessionId { get; set; }
 
         // Index of the verifier issuing this Response from the new set of nodes
-        public int Index { get; set; }
+        internal int Index { get; set; }
 
         // Complain/Approval
-        public ResponseStatus Status { get; set; } = ResponseStatus.Complaint;
-        public ComplaintCode Complaint { get; set; } = ComplaintCode.NoComplaint;
+        internal ResponseStatus Status { get; set; } = ResponseStatus.Complaint;
+        internal ComplaintCode Complaint { get; set; } = ComplaintCode.NoComplaint;
 
         // Signature over the whole packet
-        public byte[] Signature { get; set; } = [];
+        internal byte[] Signature { get; set; } = [];
 
         public byte[] GetBytesForSignature()
         {

@@ -35,6 +35,8 @@ using SHA256 = System.Security.Cryptography.SHA256;
 
 using System.Runtime.CompilerServices;
 using dkg.group;
+using Org.BouncyCastle.Asn1.Ocsp;
+using Org.BouncyCastle.Crypto;
 
 [assembly: InternalsVisibleTo("dkgLibraryTests")]
 
@@ -42,7 +44,7 @@ namespace dkg.poly
 {
     public class Share(int I) : IMarshalling, IEquatable<Share>
     {
-        public int I { get; set; } = I;
+        internal int I { get; set; } = I;
 
         public bool Equals(Share? other)
         {
@@ -154,7 +156,7 @@ namespace dkg.poly
     // PubShare represents a public share.
     public class PubShare(int I, IPoint V) : Share(I), IEquatable<PubShare>
     {
-        public IPoint V { get; set; } = V;
+        internal IPoint V { get; set; } = V;
         public bool Equals(PubShare? other)
         {
             if (other == null) return false;

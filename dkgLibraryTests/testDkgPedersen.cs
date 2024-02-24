@@ -324,8 +324,11 @@ namespace DkgTests
             // 3. make sure nobody has a QUAL set
             foreach (var dkg in thrDKGs.Values)
             {
-                Assert.That(dkg.Certified(), Is.False);
-                Assert.That(dkg.QUAL().Count, Is.EqualTo(0));
+                Assert.Multiple(() =>
+                {
+                    Assert.That(dkg.Certified(), Is.False);
+                    Assert.That(dkg.QUAL().Count, Is.EqualTo(0));
+                });
                 foreach (var dkg2 in thrDKGs.Values)
                 {
                     Assert.That(dkg.IsInQUAL(dkg2.Nidx), Is.False);

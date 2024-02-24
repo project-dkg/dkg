@@ -34,16 +34,16 @@ namespace dkg.vss
     public class Dealer
     {
         private IGroup G { get; }
-        public IScalar LongTermKey { get; set; }
-        public IPoint PublicKey { get; set; }
-        public IScalar Secret { get; set; }
-        public IPoint[] Verifiers { get; set; }
-        public PriPoly SecretPoly { get; set; }
-        public byte[] HkdfContext { get; set; }
-        public int T { get; set; }
-        public byte[] SessionId { get; set; }
-        public Deal[] Deals { get; set; }
-        public Aggregator Aggregator { get; set; }
+        internal IScalar LongTermKey { get; set; }
+        internal IPoint PublicKey { get; set; }
+        internal IScalar Secret { get; set; }
+        internal IPoint[] Verifiers { get; set; }
+        internal PriPoly SecretPoly { get; set; }
+        internal byte[] HkdfContext { get; set; }
+        internal int T { get; set; }
+        internal byte[] SessionId { get; set; }
+        internal Deal[] Deals { get; set; }
+        internal Aggregator Aggregator { get; set; }
 
         // NewDealer returns a Dealer capable of leading the secret sharing scheme. It
         // does not have to be trusted by other Verifiers. The security parameter t is

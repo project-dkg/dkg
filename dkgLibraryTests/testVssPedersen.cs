@@ -474,12 +474,17 @@ namespace VssTests
             });
 
             err = v1.ProcessResponse(resp2);
-            Assert.That(err, Is.Not.Null);
+            // Let attempt to add duplicate be no-op
+            // Assert.That(err, Is.Not.Null);
+            Assert.That(err, Is.Null);
 
             v1.Responses().Remove(v2.Index);
             var sessionId = VssTools.CreateSessionId(_dealerPub, [.. _verifiersPub], [.. dealer.Deals[v2.Index].Commitments], dealer.T);
             v1.Responses()[v2.Index] = new Response(sessionId, v2.Index) { Status = ResponseStatus.Approval };
-            Assert.That(v1.ProcessResponse(resp2), Is.Not.Null);
+            err = v1.ProcessResponse(resp2);
+            // Let attempt to add duplicate be no-op
+            // Assert.That(err, Is.Not.Null);
+            Assert.That(err, Is.Null);
         }
 
         [Test]
@@ -672,7 +677,9 @@ namespace VssTests
             {
                 Assert.That(aggr.AddResponse(c), Is.Null);
                 Assert.That(c, Is.EqualTo(aggr.Responses[idx]));
-                Assert.That(aggr.AddResponse(c), Is.Not.Null);
+                // Let add duplicate be no-op
+                // Assert.That(aggr.AddResponse(c), Is.Not.Null);
+                Assert.That(aggr.AddResponse(c), Is.Null);
 
             });
             aggr.Responses.Remove(idx);

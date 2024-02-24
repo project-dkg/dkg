@@ -28,16 +28,16 @@ namespace dkg.vss
     public class Justification(byte[] sessionId, int index, Deal deal)
     {
         // SessionId related to the current run of the protocol
-        public byte[] SessionId { get; set; } = sessionId;
+        internal byte[] SessionId { get; set; } = sessionId;
 
         // Index of the verifier who issued the Complaint,i.e. index of this Deal
-        public int Index { get; set; } = index;
+        internal int Index { get; set; } = index;
 
         // Deal in cleartext
-        public Deal Deal { get; set; } = deal;
+        internal Deal Deal { get; set; } = deal;
 
         // Signature over the whole packet
-        public byte[] Signature { get; set; } = [];
+        internal byte[] Signature { get; set; } = [];
 
         public byte[] GetBytesForSignature()
         {
