@@ -28,3 +28,6 @@
 ## С чего начинать
 - ```dkgLibraryTests/AnEndToEndExample.cs``` -- этот тест демонстрирует основные возможности алгоритма распределённой генерации ключей и схемы Шамира в синхронном виде (алгоритм, предложенный Pederson'ом по свой природе являеся синхронным).
 - ```dkgSample/Program.cs``` -- асинхронная (многопоточная) реализация алгоритма распределённой генерации ключей и схемы Шамира в видк gRPC сервера. Задача синхронизации узлов в этом приложении не решалась, испльзуются временные задержки.
+
+## Project financing
+Initial development of this project was spansored by [NarayanaSupramati](https://www.github.com/NarayanaSupramati)
