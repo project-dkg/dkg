@@ -3,6 +3,7 @@
 
 # Dkg
 Implementation in C# of a distributed key generation algorithm (Pedersen 91) with a K-of-N threshold scheme (Shamir scheme) on standard elliptic curves (Sec256k1 with an option to replace)
+
 Реализация на c# алгоритма распределённой генерации ключей (Pedersen 91) с пороговой схемой K из N (схема Шамира) на стандартных эллиптических кривых (Sec256k1 c возможностью замены)
 
 ## Theoretical basis/Теоретическая основа
@@ -19,6 +20,7 @@ These articles are available at ```docs``` folder.
 
 ## Practical basis/Практическая основа
 This development is the result of translation into C# and subsequent refactoring of the implementation of the above algorithms in the library [dedis](https://github.com/dedis/kyber)
+
 Данная разработка - результат перевода на C# и последующего рефакторинга реализации вышеперечисленных алгоритмов в библиотеке [dedis](https://github.com/dedis/kyber)
 
 ## Solution structure/Структура решения
