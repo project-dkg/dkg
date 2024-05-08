@@ -23,6 +23,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+using dkg.group;
+using dkg.poly;
+
 namespace ShareTests
 {
     internal class ShareComparerTests
@@ -170,9 +173,21 @@ namespace ShareTests
             _priShare.MarshalBinary(stream);
             Assert.That(stream.Length, Is.EqualTo(_priShare.MarshalSize()));
             stream.Position = 0;
-            Secp256k1Scalar scalar2 = new Secp256k1Scalar();
-            PriShare share2 = new(20, scalar2);
+            PriShare share2 = new();
             share2.UnmarshalBinary(stream);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_priShare, Is.EqualTo(share2));
+                Assert.That(_priShare.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+            });
+        }
+
+        [Test]
+        public void TestGetSetBytes()
+        {
+            byte[] bytes = _priShare.GetBytes();
+            PriShare share2 = new();
+            share2.SetBytes(bytes);
             Assert.Multiple(() =>
             {
                 Assert.That(_priShare, Is.EqualTo(share2));
@@ -245,8 +260,7 @@ namespace ShareTests
             _pubShare.MarshalBinary(stream);
             Assert.That(stream.Length, Is.EqualTo(_pubShare.MarshalSize()));
             stream.Position = 0;
-            IPoint point2 = new Secp256k1Point().Base().Mul(new Secp256k1Scalar().SetInt64(67));
-            PubShare share2 = new(20, point2);
+            PubShare share2 = new();
             share2.UnmarshalBinary(stream);
             Assert.Multiple(() =>
             {
@@ -255,5 +269,17 @@ namespace ShareTests
             });
         }
 
+        [Test]
+        public void TestGetSetBytes()
+        {
+            byte[] bytes = _pubShare.GetBytes();
+            PubShare share2 = new();
+            share2.SetBytes(bytes);
+            Assert.Multiple(() =>
+            {
+                Assert.That(_pubShare, Is.EqualTo(share2));
+                Assert.That(_pubShare.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+            });
+        }
     }
 }

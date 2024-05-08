@@ -52,21 +52,34 @@ namespace dkg.poly
             return I == other.I;
         }
 
-        public void MarshalBinary(Stream s)
+        public virtual void MarshalBinary(Stream s)
         {
             BinaryWriter w = new(s);
             w.Write(I);
         }
 
-        public int MarshalSize()
+        public virtual int MarshalSize()
         {
             return sizeof(int);
         }
 
-        public void UnmarshalBinary(Stream s)
+        public virtual void UnmarshalBinary(Stream s)
         {
             BinaryReader reader = new(s);
             I = reader.ReadInt32();
+        }
+
+        public virtual byte[] GetBytes()
+        {
+            using MemoryStream stream = new MemoryStream();
+            MarshalBinary(stream);
+            return stream.ToArray();
+        }
+
+        public virtual void SetBytes(byte[] bytes)
+        {
+            using MemoryStream stream = new MemoryStream(bytes);
+            UnmarshalBinary(stream);
         }
 
         public override bool Equals(object? obj)
@@ -94,10 +107,18 @@ namespace dkg.poly
     }
 
     // PriShare represents a private share.
-    public class PriShare(int I, IScalar V) : Share(I), IMarshalling, IEquatable<PriShare>
+    public class PriShare: Share, IMarshalling, IEquatable<PriShare>
     {
-        public IScalar V { get; set; } = V;
+        public IScalar V { get; set; }
+        public PriShare(): base(0)
+        { 
+            V = new Secp256k1Scalar();
+        }
 
+        public PriShare(int I, IScalar V) : base(I)
+        {
+            this.V = V;
+        }
         public bool Equals(PriShare? other)
         {
             if (other == null) return false;
@@ -117,26 +138,26 @@ namespace dkg.poly
             return h;
         }
 
-        public new void MarshalBinary(Stream s)
+        public override void MarshalBinary(Stream s)
         {
             base.MarshalBinary(s);
             V.MarshalBinary(s);
         }
 
-        public new int MarshalSize()
+        public override int MarshalSize()
         {
             return base.MarshalSize() + V.MarshalSize();
+        }
+
+        public override void UnmarshalBinary(Stream s)
+        {
+            base.UnmarshalBinary(s);
+            V.UnmarshalBinary(s);
         }
 
         public override string ToString()
         {
             return $"{{PriShare: I = {I}; V = {V}}}";
-        }
-
-        public new void UnmarshalBinary(Stream s)
-        {
-            base.UnmarshalBinary(s);
-            V.UnmarshalBinary(s);
         }
 
         public override bool Equals(object? obj)
@@ -154,9 +175,19 @@ namespace dkg.poly
     }
 
     // PubShare represents a public share.
-    public class PubShare(int I, IPoint V) : Share(I), IEquatable<PubShare>
+    public class PubShare : Share, IMarshalling, IEquatable<PubShare>
     {
-        internal IPoint V { get; set; } = V;
+        internal IPoint V { get; set; }
+
+        public PubShare() : base(0)
+        {
+            V = new Secp256k1Point();
+        }
+
+        public PubShare(int I, IPoint V) : base(I)
+        {
+            this.V = V;
+        }
         public bool Equals(PubShare? other)
         {
             if (other == null) return false;
@@ -175,26 +206,25 @@ namespace dkg.poly
             h = [.. h, .. iBytes];
             return h;
         }
-        public new void MarshalBinary(Stream s)
+        public override void MarshalBinary(Stream s)
         {
             base.MarshalBinary(s);
             V.MarshalBinary(s);
         }
 
-        public new int MarshalSize()
+        public override int MarshalSize()
         {
             return base.MarshalSize() + V.MarshalSize();
+        }
+        public override void UnmarshalBinary(Stream s)
+        {
+            base.UnmarshalBinary(s);
+            V.UnmarshalBinary(s);
         }
         public override string ToString()
         {
             return $"{{PubShare: I = {I}; V = {V}}}";
         }
-        public new void UnmarshalBinary(Stream s)
-        {
-            base.UnmarshalBinary(s);
-            V.UnmarshalBinary(s);
-        }
-
         public override bool Equals(object? obj)
         {
             return Equals(obj as PubShare);

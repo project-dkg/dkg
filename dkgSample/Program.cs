@@ -32,8 +32,6 @@ using Google.Protobuf;
 using Grpc.Core;
 using System.Text;
 using static DkgNodeApi.DkgNode;
-using static Org.BouncyCastle.Math.EC.ECCurve;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace dkg.sample
 {
@@ -374,7 +372,6 @@ namespace dkg.sample
 
         public void Start()
         {
-
             GRpcServer.Start();
             TheThread.Start();
         }
