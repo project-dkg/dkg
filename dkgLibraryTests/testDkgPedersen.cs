@@ -238,7 +238,7 @@ namespace DkgTests
                 shares[i] = dks.Share;
             }
 
-            var secret = PriPoly.RecoverSecret(_g, shares, _defaultN, _defaultN);
+            var secret = PriPoly.RecoverSecret(_g, shares, _defaultN);
             Assert.That(secret, Is.Not.Null);
 
             var secretCoeffs = poly!.Coeffs;
@@ -542,8 +542,8 @@ namespace DkgTests
                 }
             }
             // 2.
-            var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT, n);
-            var newSecret = PriPoly.RecoverSecret(_g, [.. newShares], newT, newN);
+            var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT);
+            var newSecret = PriPoly.RecoverSecret(_g, [.. newShares], newT);
             Assert.That(newSecret, Is.EqualTo(oldSecret));
         }
 
@@ -598,8 +598,8 @@ namespace DkgTests
             }
             var thr = VssTools.MinimumT(_defaultN);
             // 2.
-            var oldSecret = PriPoly.RecoverSecret(_g, sshares, thr, _defaultN);
-            var newSecret = PriPoly.RecoverSecret(_g, newSShares, thr, _defaultN);
+            var oldSecret = PriPoly.RecoverSecret(_g, sshares, thr);
+            var newSecret = PriPoly.RecoverSecret(_g, newSShares, thr);
             Assert.That(newSecret, Is.EqualTo(oldSecret));
         }
 
@@ -680,8 +680,8 @@ namespace DkgTests
             // 2.
             try
             {
-                var oldSecret = PriPoly.RecoverSecret(_g, sshares.Take(newN).ToArray(), thr, newN);
-                var newSecret = PriPoly.RecoverSecret(_g, newSShares, thr, newN);
+                var oldSecret = PriPoly.RecoverSecret(_g, sshares.Take(newN).ToArray(), thr);
+                var newSecret = PriPoly.RecoverSecret(_g, newSShares, thr);
                 Assert.That(newSecret, Is.EqualTo(oldSecret));
             }
             catch (DkgError ex)
@@ -922,8 +922,8 @@ namespace DkgTests
             // check shares reconstruct to the same secret
             try
             {
-                var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT, oldN);
-                var newSecret = PriPoly.RecoverSecret(_g, newSShares, newT, newN);
+                var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT);
+                var newSecret = PriPoly.RecoverSecret(_g, newSShares, newT);
                 Assert.That(newSecret, Is.EqualTo(oldSecret));
             }
             catch (DkgError ex)
@@ -1193,8 +1193,8 @@ namespace DkgTests
             // check shares reconstruct to the same secret
             try
             {
-                var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT, oldN);
-                var newSecret = PriPoly.RecoverSecret(_g, newSShares, newT, newN);
+                var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT);
+                var newSecret = PriPoly.RecoverSecret(_g, newSShares, newT);
                 Assert.That(newSecret, Is.EqualTo(oldSecret));
             }
             catch (DkgError ex)
@@ -1424,8 +1424,8 @@ namespace DkgTests
             }
 
             // check shares reconstruct to the same secret
-            var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT, oldN);
-            var newSecret = PriPoly.RecoverSecret(_g, newSShares, newT, newN);
+            var oldSecret = PriPoly.RecoverSecret(_g, sshares, oldT);
+            var newSecret = PriPoly.RecoverSecret(_g, newSShares, newT);
 
             Assert.That(newSecret, Is.EqualTo(oldSecret));
         }

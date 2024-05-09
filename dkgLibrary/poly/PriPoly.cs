@@ -216,9 +216,9 @@ namespace dkg.poly
 
         // RecoverSecret reconstructs the shared secret p(0) from a list of private
         // shares using Lagrange interpolation.
-        public static IScalar RecoverSecret(IGroup g, PriShare[] shares, int t, int n)
+        public static IScalar RecoverSecret(IGroup g, PriShare[] shares, int t)
         {
-            var (x, y) = XyScalar(g, shares, t, n);
+            var (x, y) = XyScalar(g, shares, t);
 
             if (x.Count < t)
             {
@@ -249,7 +249,7 @@ namespace dkg.poly
         // xyScalar returns the list of (x_i, y_i) pairs indexed. The first map returned
         // is the list of x_i and the second map is the list of y_i, both indexed in
         // their respective map at index i.
-        public static (Dictionary<int, IScalar>, Dictionary<int, IScalar>) XyScalar(IGroup g, PriShare[] shares, int t, int n)
+        public static (Dictionary<int, IScalar>, Dictionary<int, IScalar>) XyScalar(IGroup g, PriShare[] shares, int t)
         {
             List<PriShare> sorted = shares.Where(s => s != null).ToList();
             sorted.Sort(new ShareComparer());
@@ -277,9 +277,9 @@ namespace dkg.poly
         // coefficients.  It is up to the caller to make sure that there are enough
         // shares to correctly re-construct the polynomial. There must be at least t
         // shares.
-        public static PriPoly? RecoverPriPoly(IGroup g, PriShare[] shares, int t, int n)
+        public static PriPoly? RecoverPriPoly(IGroup g, PriShare[] shares, int t)
         {
-            var (x, y) = XyScalar(g, shares, t, n);
+            var (x, y) = XyScalar(g, shares, t);
             if (x.Count != t)
             {
                 throw new ArgumentException("PriPoly.RecoverPriPoly: Not enough shares to recover private polynomial");

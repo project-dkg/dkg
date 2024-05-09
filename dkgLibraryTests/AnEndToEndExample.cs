@@ -141,7 +141,7 @@ namespace AnEndToEndExample
             string message = "Hello world";
 
             var cipher = ECElGamalEncryption.Encrypt(g, publicKey!, message);
-            IScalar secretKey = PriPoly.RecoverSecret(g, shares, n, n);
+            IScalar secretKey = PriPoly.RecoverSecret(g, shares, n);
 
             var decryptedMessage = ECElGamalEncryption.DecryptString(g, secretKey, cipher);
             Assert.That(decryptedMessage, Is.EqualTo(message));
