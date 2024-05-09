@@ -131,7 +131,7 @@ namespace VssTests
                 Assert.That(com, Is.EqualTo(dkgCommits[0]));
 
                 // Compute the refreshed private DKG share of node i
-                var s = PriPoly.RecoverSecret(g, tmpPriShares, t, n);
+                var s = PriPoly.RecoverSecret(g, tmpPriShares, t);
                 newDKGShares[i] = new PriShare(i, s);
             }
 
@@ -166,7 +166,7 @@ namespace VssTests
             }
 
             // Recover the private polynomial
-            var refreshedPriPoly = PriPoly.RecoverPriPoly(g, newDKGShares, t, n);
+            var refreshedPriPoly = PriPoly.RecoverPriPoly(g, newDKGShares, t);
 
             // Check that the secret and the corresponding (old) public commit match
             Assert.That(refreshedPriPoly, Is.Not.Null);

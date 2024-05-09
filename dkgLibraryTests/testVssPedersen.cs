@@ -152,7 +152,7 @@ namespace VssTests
             }
 
             // 5. recover
-            var sec = Dealer.RecoverSecret(_g, deals, _nbVerifiers, VssTools.MinimumT(_nbVerifiers));
+            var sec = Dealer.RecoverSecret(_g, deals, VssTools.MinimumT(_nbVerifiers));
             Assert.That(sec, Is.Not.Null);
             Assert.That(sec, Is.EqualTo(_secret));
 

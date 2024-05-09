@@ -170,7 +170,7 @@ namespace dkg.vss
         // RecoverSecret recovers the secret shared by a Dealer by gathering at least t
         // GetDistDeals from the verifiers. It returns an error if there is not enough GetDistDeals or
         // if all GetDistDeals don't have the same SessionID.
-        public static IScalar RecoverSecret(IGroup group, Deal[] deals, int n, int t)
+        public static IScalar RecoverSecret(IGroup group, Deal[] deals, int t)
         {
             PriShare[] shares = new PriShare[deals.Length];
             for (int i = 0; i < deals.Length; i++)
@@ -185,7 +185,7 @@ namespace dkg.vss
                     throw new DkgError("All deals need to have same session id", "RecoverSecret");
                 }
             }
-            return PriPoly.RecoverSecret(group, shares, t, n);
+            return PriPoly.RecoverSecret(group, shares, t);
         }
     }
 }

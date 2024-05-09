@@ -797,7 +797,7 @@ namespace dkg.share
 
             // the private polynomial is generated from the old nodes, thus inheriting
             // the old threshold condition
-            var priPoly = PriPoly.RecoverPriPoly(G, shares, OldT, C.OldNodes.Length) ??
+            var priPoly = PriPoly.RecoverPriPoly(G, shares, OldT) ??
                           throw new DkgError("Could not recover PriPoly", GetType().Name);
 
             var privateShare = new PriShare(Nidx, priPoly.Secret());

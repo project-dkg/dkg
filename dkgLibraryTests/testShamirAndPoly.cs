@@ -36,7 +36,7 @@ namespace ShamirAndPolyTests
             var poly = new PriPoly(g, t, null);
             var shares = poly.Shares(n);
 
-            var recovered = PriPoly.RecoverSecret(g, shares, t, n);
+            var recovered = PriPoly.RecoverSecret(g, shares, t);
             if (recovered == null)
             {
                 Assert.Fail("Error recovering secret");
@@ -67,7 +67,7 @@ namespace ShamirAndPolyTests
             var selected = shares.ToList().GetRange(n - t, t);
             Assert.That(selected, Has.Count.EqualTo(t));
 
-            var recovered = PriPoly.RecoverSecret(g, [.. selected], t, t + 1);
+            var recovered = PriPoly.RecoverSecret(g, [.. selected], t);
             if (recovered == null)
             {
                 Assert.Fail("Error recovering secret");
@@ -88,7 +88,7 @@ namespace ShamirAndPolyTests
             var selected = shares.ToList().GetRange(n - t, t - 1);
             Assert.That(selected, Has.Count.EqualTo(t - 1));
 
-            Assert.Throws<ArgumentException>(() => PriPoly.RecoverSecret(g, [.. selected], t, t));
+            Assert.Throws<ArgumentException>(() => PriPoly.RecoverSecret(g, [.. selected], t));
         }
 
         [Test]
@@ -106,7 +106,7 @@ namespace ShamirAndPolyTests
             shares.RemoveAt(2);
             shares.RemoveAt(1);
 
-            var recovered = PriPoly.RecoverSecret(g, [.. shares], shares.Count, n);
+            var recovered = PriPoly.RecoverSecret(g, [.. shares], shares.Count);
             if (recovered == null)
             {
                 Assert.Fail("Error recovering secret");
@@ -203,10 +203,10 @@ namespace ShamirAndPolyTests
             var reverses = shares;
             reverses.Reverse();
 
-            var recovered = PriPoly.RecoverPriPoly(g, shares, t, n);
+            var recovered = PriPoly.RecoverPriPoly(g, shares, t);
             Assert.That(recovered, Is.Not.Null);
 
-            var reverseRecovered = PriPoly.RecoverPriPoly(g, reverses, t, n);
+            var reverseRecovered = PriPoly.RecoverPriPoly(g, reverses, t);
             Assert.That(reverseRecovered, Is.Not.Null);
 
             for (int i = 0; i < t; i++)
