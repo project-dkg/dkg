@@ -43,5 +43,8 @@ The C# solution includes three projects:
 - ```dkgLibraryTests/AnEndToEndExample.cs``` -- этот тест демонстрирует основные возможности алгоритма распределённой генерации ключей и схемы Шамира в синхронном виде (алгоритм, предложенный Pederson'ом по свой природе являеся синхронным).
 - ```dkgSample/Program.cs``` -- асинхронная (многопоточная) реализация алгоритма распределённой генерации ключей и схемы Шамира в видк gRPC сервера. Задача синхронизации узлов в этом приложении не решалась, испльзуются временные задержки.
 
+## Continuation project ... / Продолжение ...
+https://github.com/maxirmx/dkg-nodes
+
 ## Project financing
 Initial development of this project was financed by [NarayanaSupramati](https://www.github.com/NarayanaSupramati)
