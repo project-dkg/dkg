@@ -159,7 +159,7 @@ namespace Secp256k1Tests
             byte[] bytes = _scalar.GetBytes();
             Secp256k1Scalar scalar2 = new();
             scalar2.SetBytes(bytes);
-            Assert.That(_scalar.Equals(scalar2));
+            Assert.That(_scalar, Is.EqualTo(scalar2));
         }
 
         [Test]
@@ -172,7 +172,7 @@ namespace Secp256k1Tests
             stream.Position = 0;
             Secp256k1Scalar scalar2 = new();
             scalar2.UnmarshalBinary(stream);
-            Assert.That(_scalar.Equals(scalar2));
+            Assert.That(_scalar, Is.EqualTo(scalar2));
         }
     }
 
@@ -266,7 +266,7 @@ namespace Secp256k1Tests
             Secp256k1Point point2 = new(); 
             point2.Pick(new RandomStream());
             point2.SetBytes(bytes);
-            Assert.That(_point.Equals(point2));
+            Assert.That(_point, Is.EqualTo(point2));
         }
 
         [Test]
@@ -279,7 +279,7 @@ namespace Secp256k1Tests
             stream.Position = 0;
             Secp256k1Point point2 = new();
             point2.UnmarshalBinary(stream);
-            Assert.That(_point.Equals(point2));
+            Assert.That(_point, Is.EqualTo(point2));
         }
     }
 
@@ -344,7 +344,7 @@ namespace Secp256k1Tests
             var embedded = _group.EmbedData(plainData);
 
             var extractedData = embedded.ExtractData();
-            Assert.That(message.Substring(0, _group.EmbedLen()) , Is.EqualTo(Encoding.UTF8.GetString(extractedData)));
+            Assert.That(message[.._group.EmbedLen()] , Is.EqualTo(Encoding.UTF8.GetString(extractedData)));
         }
     }
 }

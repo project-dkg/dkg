@@ -63,7 +63,7 @@ namespace dkg.group
         {
             return _value;
         }
-        public int GetLength()
+        public static int GetLength()
         {
             return _length;
         }
@@ -153,7 +153,7 @@ namespace dkg.group
             if (s2 is not Secp256k1Scalar other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Scalar");
 
-            return new Secp256k1Scalar(_value.ModMultiply(other2._value, _order));
+            return new Secp256k1Scalar(_value.Multiply(other2._value).Mod(_order));
         }
 
         public IScalar Div(IScalar s2)
@@ -161,7 +161,8 @@ namespace dkg.group
             if (s2 is not Secp256k1Scalar other2)
                 throw new InvalidCastException("s2 is not a Secp256k1Scalar");
 
-            return new Secp256k1Scalar(_value.ModDivide(other2._value, _order));
+            BigInteger inverse = other2._value.ModInverse(_order);
+            return new Secp256k1Scalar(_value.Multiply(inverse).Mod(_order));
         }
 
         public IScalar Inv()
@@ -224,7 +225,7 @@ namespace dkg.group
     {
         public ECPoint _point;
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
-        private static readonly ECCurve _curve = _ecP.Curve;
+        // private static readonly ECCurve _curve = _ecP.Curve;
 
         public Secp256k1Point()
         {
@@ -408,7 +409,7 @@ namespace dkg.group
     public class Secp256k1Group : IGroup, IEquatable<Secp256k1Group>
     {
         private static readonly X9ECParameters _ecP = ECNamedCurveTable.GetByName("secp256k1");
-        private static readonly Org.BouncyCastle.Math.EC.ECCurve _curve = _ecP.Curve;
+        // JFYI private static readonly Org.BouncyCastle.Math.EC.ECCurve _curve = _ecP.Curve;
 
         private readonly RandomStream _strm = new();
         public override bool Equals(object? obj)
@@ -435,7 +436,7 @@ namespace dkg.group
         }
         public static int SScalarLen()
         {
-            return new Secp256k1Scalar().GetLength();
+            return Secp256k1Scalar.GetLength();
         }
         public int ScalarLen()
         {
@@ -485,7 +486,7 @@ namespace dkg.group
             // Check if the message is null or empty
             if (message == null || message.Length == 0)
             {
-                throw new ArgumentException(nameof(message), "EmbedMessage: Message cannot be null or empty");
+                throw new ArgumentException("EmbedMessage: Message cannot be null or empty", nameof(message));
             }
 
             int dataLength = Math.Min(message.Length, EmbedLen());
