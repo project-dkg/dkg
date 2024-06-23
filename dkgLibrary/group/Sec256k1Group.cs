@@ -485,7 +485,7 @@ namespace dkg.group
             // Check if the message is null or empty
             if (message == null || message.Length == 0)
             {
-                throw new ArgumentException(nameof(message), "EmbedMessage: Message cannot be null or empty");
+                throw new ArgumentException("EmbedMessage: Message cannot be null or empty", nameof(message));
             }
 
             int dataLength = Math.Min(message.Length, EmbedLen());
