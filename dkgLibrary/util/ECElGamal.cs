@@ -59,13 +59,9 @@ namespace dkg.util
             return (C1, C2);
         }
 
-        public static byte[] DecryptData(IGroup G, IScalar privateKey, (IPoint C1, IPoint C2) cipher)
+        public static byte[] DecryptData(IScalar privateKey, (IPoint C1, IPoint C2) cipher)
         {
-            Secp256k1Point? M = cipher.C2.Sub(cipher.C1.Mul(privateKey)) as Secp256k1Point;
-            if (M == null)
-            {
-                throw new InvalidCastException("Decryption failed: cypher type does not match");
-            }
+            Secp256k1Point? M = cipher.C2.Sub(cipher.C1.Mul(privateKey)) as Secp256k1Point ?? throw new InvalidCastException("Decryption failed: cypher type does not match");
             byte[] plainBytes = M.ExtractData();
             return plainBytes;
         }
@@ -75,9 +71,9 @@ namespace dkg.util
             return Encrypt(G, publicKey, Encoding.UTF8.GetBytes(plaintext));
         }
 
-        public static string DecryptString(IGroup G, IScalar privateKey, (IPoint C1, IPoint C2) ciphertext)
+        public static string DecryptString(IScalar privateKey, (IPoint C1, IPoint C2) ciphertext)
         {
-            byte[] plaintextBytes = DecryptData(G, privateKey, ciphertext);
+            byte[] plaintextBytes = DecryptData(privateKey, ciphertext);
             return Encoding.UTF8.GetString(plaintextBytes);
         }
     }

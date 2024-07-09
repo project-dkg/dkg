@@ -96,11 +96,10 @@ namespace dkg.vss
                 var dhKey = G.Point();
                 dhKey.UnmarshalBinary(new MemoryStream(encrypted.DHKey));
                 var pre = DhHelper.DhExchange(LongTermKey, dhKey);
-                var gcm = DhHelper.CreateAEAD(pre, HkdfContext);
+                var nonce = encrypted.Nonce;
+                var gcm = DhHelper.CreateAEAD(false, pre, HkdfContext, nonce);
 
-                byte[] decrypted = new byte[encrypted.Cipher.Length];
-
-                gcm.Decrypt(encrypted.Nonce, encrypted.Cipher, encrypted.Tag, decrypted);
+                DhHelper.Decrypt(gcm, encrypted.Cipher, encrypted.Tag, out byte[] decrypted);
 
                 var deal = new Deal();
                 deal.UnmarshalBinary(new MemoryStream(decrypted));

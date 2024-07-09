@@ -89,11 +89,13 @@ namespace ShareTests
                 Share share2 = new(20);
                 Share share3 = new(20);
 
-                Assert.That(share1, Is.Not.EqualTo(null));
-                Assert.That(share1, Is.Not.EqualTo(share2));
-                Assert.That(share3, Is.EqualTo(share2));
-                Assert.That(share1.GetHashCode(), Is.Not.EqualTo(share2.GetHashCode()));
-                Assert.That(share3.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+                Assert.Multiple(()=> { 
+                    Assert.That(share1, Is.Not.EqualTo(null));
+                    Assert.That(share1, Is.Not.EqualTo(share2));
+                    Assert.That(share3, Is.EqualTo(share2));
+                    Assert.That(share1.GetHashCode(), Is.Not.EqualTo(share2.GetHashCode()));
+                    Assert.That(share3.GetHashCode(), Is.EqualTo(share2.GetHashCode()));
+                });
             }
 
             [Test]
@@ -136,8 +138,8 @@ namespace ShareTests
         [Test]
         public void TestHash()
         {
-            byte[] h = [236, 73, 22, 221, 40, 252, 76, 16, 215, 142, 40, 124, 165, 217, 204, 81, 
-                        238, 26, 231, 60, 191, 222, 8, 198, 179, 115, 36, 203, 250, 172, 139, 197, 5, 0, 0, 0];
+            byte[] h = [201, 250, 51, 250, 139, 77, 119, 248, 174, 219, 8, 118, 32, 50, 
+                        110, 22, 95, 163, 172, 125, 249, 85, 106, 184, 55, 79, 7, 81, 12, 70, 195, 252];
             var hash = _priShare.Hash();
             Assert.That(hash, Is.EqualTo(h));
         }
@@ -221,8 +223,8 @@ namespace ShareTests
         [Test]
         public void TestHash()
         {
-            byte[] h = [15, 113, 91, 175, 93, 76, 46, 211, 41, 120, 92, 239, 41, 229, 98, 247, 52, 
-                        136, 200, 162, 187, 157, 188, 87, 0, 179, 97, 213, 75, 155, 5, 84, 7, 0, 0, 0];
+            byte[] h = [68, 20, 42, 98, 115, 0, 220, 153, 74, 10, 73, 145, 246, 129, 206, 170, 
+                        86, 19, 209, 80, 155, 136, 255, 20, 213, 171, 156, 152, 249, 249, 108, 250];
             var hash = _pubShare.Hash();
             Assert.That(hash, Is.EqualTo(h));
         }

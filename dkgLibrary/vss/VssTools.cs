@@ -24,7 +24,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 using dkg.group;
-using SHA256 = System.Security.Cryptography.SHA256;
+using Org.BouncyCastle.Crypto.Digests;
 
 
 namespace dkg.vss
@@ -45,7 +45,15 @@ namespace dkg.vss
                 cmt.MarshalBinary(strm);
             }
             strm.Write(BitConverter.GetBytes((uint)t));
-            return SHA256.HashData(strm.ToArray());
+
+            // Use BouncyCastle's SHA-256 implementation
+            Sha256Digest digest = new();
+            byte[] inputBytes = strm.ToArray();
+            digest.BlockUpdate(inputBytes, 0, inputBytes.Length);
+            byte[] result = new byte[digest.GetDigestSize()];
+            digest.DoFinal(result, 0);
+
+            return result;
         }
 
         // MinimumT returns a safe value of T that balances secrecy and robustness.

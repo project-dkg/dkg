@@ -25,18 +25,19 @@
 
 using dkg.group;
 using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Generators;
+using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Parameters;
-using System.Security.Cryptography;
 using System.Text;
 
 namespace dkg.util
 {
     public static class DhHelper
     {
-        public const int sharedKeySize = 32;
-        public const int nonceSizeInBytes = 12;
-        public const int tagSizeInBytes = 16;
+        public const int SharedKeySize = 32;
+        public const int NonceSizeInBytes = 12;
+        public const int TagSizeInBytes = 16;
 
         // dhExchange computes the shared key from a private key and a public key
         public static IPoint DhExchange(IScalar ownPrivate, IPoint remotePublic)
@@ -45,12 +46,12 @@ namespace dkg.util
         }
 
         // CreateAEAD returns the AEAD cipher to be used to encrypt a share
-        public static AesGcm CreateAEAD(IPoint preSharedKey, byte[] hkdfContext)
+        public static GcmBlockCipher CreateAEAD(bool mode, IPoint preSharedKey, byte[] hkdfContext, byte[] nonce)
         {
             var sharedKey = CreateHKDF(preSharedKey.GetBytes(), hkdfContext);
-            var aes = Aes.Create();
-            aes.Key = sharedKey;
-            return new AesGcm(aes.Key, tagSizeInBytes);
+            var cipher = new GcmBlockCipher(new AesEngine());
+            cipher.Init(mode, new AeadParameters(new KeyParameter(sharedKey), TagSizeInBytes * 8, nonce));
+            return cipher;
         }
 
         public static byte[] CreateHKDF(byte[] preSharedKey, byte[] hkdfContext)
@@ -62,8 +63,8 @@ namespace dkg.util
             hkdf.Init(new HkdfParameters(preSharedKey, hkdfContext, null));
 
             // Generate shared key
-            byte[] sharedKey = new byte[sharedKeySize];
-            hkdf.GenerateBytes(sharedKey, 0, sharedKeySize);
+            byte[] sharedKey = new byte[SharedKeySize];
+            hkdf.GenerateBytes(sharedKey, 0, SharedKeySize);
 
             return sharedKey;
         }
@@ -79,7 +80,50 @@ namespace dkg.util
             {
                 vrf.MarshalBinary(strm);
             }
-            return SHA256.HashData(strm.ToArray());
+            // Use BouncyCastle's SHA256 implementation
+            var digest = new Sha256Digest();
+            var result = new byte[digest.GetDigestSize()];
+            var data = strm.ToArray();
+            digest.BlockUpdate(data, 0, data.Length);
+            digest.DoFinal(result, 0);
+            return result;
+        }
+        public static void Encrypt(GcmBlockCipher cipher, byte[] plaintext, out byte[] encrypted, out byte[] tag)
+        {
+            // Allocate space for the ciphertext, which may be slightly larger than the plaintext
+            encrypted = new byte[cipher.GetOutputSize(plaintext.Length)];
+
+            // Process the plaintext bytes through the cipher
+            int len = cipher.ProcessBytes(plaintext, 0, plaintext.Length, encrypted, 0);
+            len += cipher.DoFinal(encrypted, len);
+
+
+            tag = new byte[TagSizeInBytes];
+
+            // Extract the tag from the end of the encrypted array
+            Array.Copy(encrypted, len - TagSizeInBytes, tag, 0, TagSizeInBytes);
+
+            // Resize the encrypted array to exclude the tag
+            byte[] tempEncrypted = new byte[len - TagSizeInBytes];
+            Array.Copy(encrypted, 0, tempEncrypted, 0, len - TagSizeInBytes);
+            encrypted = tempEncrypted;
+        }
+
+        public static void Decrypt(GcmBlockCipher cipher, byte[] encrypted, byte[] tag, out byte[] decrypted)
+        {
+            // Combine the encrypted data and tag to conform with how GCMBlockCipher expects its input
+            byte[] encryptedWithTag = new byte[encrypted.Length + tag.Length];
+            Array.Copy(encrypted, 0, encryptedWithTag, 0, encrypted.Length);
+            Array.Copy(tag, 0, encryptedWithTag, encrypted.Length, tag.Length);
+
+            // Allocate space for decryption
+            decrypted = new byte[cipher.GetOutputSize(encryptedWithTag.Length)];
+
+
+            // Decrypt the data
+            int len = cipher.ProcessBytes(encryptedWithTag, 0, encryptedWithTag.Length, decrypted, 0);
+            cipher.DoFinal(decrypted, len);
         }
     }
 }
+

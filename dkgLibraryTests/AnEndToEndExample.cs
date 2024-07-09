@@ -43,7 +43,7 @@ namespace AnEndToEndExample
         [Test]
         public void EndToEndExample()
         {
-            IGroup g = new Secp256k1Group();
+            var g = new Secp256k1Group();
             // The number of nodes for this test
             int n = 7;
 
@@ -112,8 +112,8 @@ namespace AnEndToEndExample
                 Assert.Multiple(() =>
                 {
                     Assert.That(node.Dkg!.Certified(), Is.True);
-                    Assert.That(node.Dkg!.QualifiedShares().Count, Is.EqualTo(n));
-                    Assert.That(node.Dkg!.QUAL().Count, Is.EqualTo(n));
+                    Assert.That(node.Dkg!.QualifiedShares(), Has.Count.EqualTo(n));
+                    Assert.That(node.Dkg!.QUAL(), Has.Count.EqualTo(n));
                 });
             }
 
@@ -143,7 +143,7 @@ namespace AnEndToEndExample
             var cipher = ECElGamalEncryption.Encrypt(g, publicKey!, message);
             IScalar secretKey = PriPoly.RecoverSecret(g, shares, n);
 
-            var decryptedMessage = ECElGamalEncryption.DecryptString(g, secretKey, cipher);
+            var decryptedMessage = ECElGamalEncryption.DecryptString(secretKey, cipher);
             Assert.That(decryptedMessage, Is.EqualTo(message));
 
 
@@ -213,8 +213,8 @@ namespace AnEndToEndExample
             var p = g.Scalar();
             var Q = g.Base().Mul(p);
 
-            var partials = new List<IPoint>();
-            pubShares = new List<PubShare>();
+            List<IPoint> partials = [];
+            pubShares = [];
 
             for (int i = 0; i < n; i++)
             {

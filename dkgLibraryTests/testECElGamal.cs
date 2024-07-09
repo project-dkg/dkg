@@ -31,7 +31,7 @@ namespace ECElGamalTests
     {
         private IScalar _privateKey;
         private IPoint _publicKey;
-        private IGroup _g;
+        private Secp256k1Group _g;
 
         [SetUp]
         public void Setup()
@@ -52,7 +52,7 @@ namespace ECElGamalTests
             (IPoint C1, IPoint C2) cipher = ECElGamalEncryption.Encrypt(_g, _publicKey, plaintextBytes);
 
             // Decrypt the ciphertext
-            byte[] decryptedBytes = ECElGamalEncryption.DecryptData(_g, _privateKey, cipher);
+            byte[] decryptedBytes = ECElGamalEncryption.DecryptData(_privateKey, cipher);
 
             // Check that the decrypted bytes match the original plaintext bytes
             Assert.That(decryptedBytes, Is.EqualTo(plaintextBytes));
@@ -67,7 +67,7 @@ namespace ECElGamalTests
             (IPoint C1, IPoint C2) cipher = ECElGamalEncryption.Encrypt(_g, _publicKey, plaintext);
 
             // Decrypt the ciphertext
-            string decrypted = ECElGamalEncryption.DecryptString(_g, _privateKey, cipher);
+            string decrypted = ECElGamalEncryption.DecryptString(_privateKey, cipher);
 
             // Check that the decrypted string matches the original plaintext
             Assert.That(decrypted, Is.EqualTo(plaintext));

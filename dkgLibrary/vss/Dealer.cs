@@ -108,13 +108,16 @@ namespace dkg.vss
 
             // AES128-GCM
             var pre = DhHelper.DhExchange(dhSecret, vPub);
-            var gcm = DhHelper.CreateAEAD(pre, HkdfContext) ?? throw new Exception("EncryptedDeal: error creating new AEAD");
-            var nonce = new byte[DhHelper.nonceSizeInBytes];
+            var nonce = new byte[DhHelper.NonceSizeInBytes];
+            using (var randomStream = new RandomStream())
+            {
+                randomStream.Read(nonce, 0, nonce.Length);
+            }
+            var gcm = DhHelper.CreateAEAD(true, pre, HkdfContext, nonce) ?? throw new Exception("EncryptedDeal: error creating new AEAD");
+            
 
             var deal = Deals[i].GetBytes();
-            byte[] encrypted = new byte[deal.Length];
-            byte[] tag = new byte[gcm.TagSizeInBytes ?? 16];
-            gcm.Encrypt(nonce, deal, encrypted, tag);
+            DhHelper.Encrypt(gcm, deal, out byte[] encrypted, out byte[] tag);
 
             return new EncryptedDeal(dhPublicBuff, signature, nonce, encrypted, tag);
         }

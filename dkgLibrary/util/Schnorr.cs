@@ -36,8 +36,7 @@
 //
 
 using dkg.group;
-
-using SHA256 = System.Security.Cryptography.SHA256;
+using Org.BouncyCastle.Crypto.Digests;
 
 namespace dkg.util
 {
@@ -108,13 +107,22 @@ namespace dkg.util
 
         private static IScalar Hash(IGroup g, IPoint publicPoint, IPoint r, byte[] msg)
         {
-            var b = new MemoryStream();
+            using var b = new MemoryStream();
+
             r.MarshalBinary(b);
             publicPoint.MarshalBinary(b);
             BinaryWriter w = new(b);
             w.Write(msg);
-            var hash = SHA256.HashData(b.ToArray());
+
+            // Use BouncyCastle's SHA-256 implementation
+            var digest = new Sha256Digest();
+            var msgBytes = b.ToArray();
+            digest.BlockUpdate(msgBytes, 0, msgBytes.Length);
+            byte[] hash = new byte[digest.GetDigestSize()];
+            digest.DoFinal(hash, 0);
+
             return g.Scalar().SetBytes(hash);
+
         }
     }
 }

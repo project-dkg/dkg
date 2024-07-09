@@ -22,8 +22,7 @@
 // CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
-
-using SHA256 = System.Security.Cryptography.SHA256;
+using Org.BouncyCastle.Crypto.Digests;
 
 namespace VssTests
 {
@@ -33,7 +32,7 @@ namespace VssTests
 
         private int _goodT;
 
-        private IGroup _g;
+        private Secp256k1Group _g;
         private IPoint _dealerPub;
         private IScalar _dealerSec;
         private IScalar _secret;
@@ -252,7 +251,7 @@ namespace VssTests
             Assert.Multiple(() =>
             {
                 Assert.That(aggr.DealCertified(), Is.False);
-                Assert.IsNull(dealer.SecretCommit());
+                Assert.That(dealer.SecretCommit(), Is.Null);
             });
 
             // Reset dealer status
@@ -284,35 +283,50 @@ namespace VssTests
 
             // all fine
             Deal? decryptedDeal = verifier.DecryptDeal(encryptedDeal);
-            Assert.That(dealer.Deals[randIdx], Is.EqualTo(decryptedDeal)); // No exception
-            Assert.That(verifier.LastProcessingError, Is.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(dealer.Deals[randIdx], Is.EqualTo(decryptedDeal)); // No exception
+                Assert.That(verifier.LastProcessingError, Is.Null);
+            });
 
             // wrong dh key
             var goodDh = encryptedDeal.DHKey;
             encryptedDeal.DHKey = _g.Point().Null().GetBytes();
-            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
-            Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+                Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            });
             encryptedDeal.DHKey = goodDh;
 
             // wrong signature
             var goodSig = encryptedDeal.Signature;
             encryptedDeal.Signature = _randomReader.ReadBytes(goodSig.Length * 2);
-            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
-            Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+                Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            });
             encryptedDeal.Signature = goodSig;
 
             // wrong ciphertext
             var goodCipher = encryptedDeal.Cipher;
             encryptedDeal.Cipher = _randomReader.ReadBytes(goodCipher.Length);
-            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
-            Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+                Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            });
             encryptedDeal.Cipher = goodCipher;
 
             // wrong tag
             var goodTag = encryptedDeal.Tag;
             encryptedDeal.Tag = _randomReader.ReadBytes(goodTag.Length);
-            Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
-            Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            Assert.Multiple(() =>
+            {
+                Assert.That(verifier.DecryptDeal(encryptedDeal), Is.Null);
+                Assert.That(verifier.LastProcessingError, Is.Not.Null);
+            });
             encryptedDeal.Tag = goodTag;
         }
 
@@ -507,9 +521,13 @@ namespace VssTests
             });
 
             var aggr = v.Aggregator;
-            Assert.That(aggr.Responses.TryGetValue(v.Index, out Response? r), Is.True);
-            Assert.That(r, Is.Not.Null);
-            Assert.That(r.Status, Is.EqualTo(ResponseStatus.Complaint));
+            Assert.Multiple(() =>
+            {
+                Assert.That(aggr.Responses.TryGetValue(v.Index, out Response? r), Is.True);
+                Assert.That(r, Is.Not.Null);
+                Assert.That(r?.Status, Is.EqualTo(ResponseStatus.Complaint));
+            });
+
 
             resp.Index = _verifiersPub.Count;
             var sig = Schnorr.Sign(_g, v.LongTermKey, resp.GetBytesForSignature());
@@ -715,7 +733,8 @@ namespace VssTests
         public void TestContext()
         {
             byte[] context = DhHelper.Context(_dealerPub, [.. _verifiersPub]);
-            Assert.That(context, Has.Length.EqualTo(SHA256.HashSizeInBytes));
+            Sha256Digest digest = new();
+            Assert.That(context, Has.Length.EqualTo(digest.GetDigestSize()));
         }
     }
 }

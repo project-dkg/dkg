@@ -31,12 +31,11 @@
 // scheme allows a committer to commit to a secret sharing polynomial so that
 // a verifier can check the claimed evaluations of the committed polynomial.
 
-using SHA256 = System.Security.Cryptography.SHA256;
 
 using System.Runtime.CompilerServices;
 using dkg.group;
-using Org.BouncyCastle.Asn1.Ocsp;
-using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Digests;
+
 
 [assembly: InternalsVisibleTo("dkgLibraryTests")]
 
@@ -71,14 +70,14 @@ namespace dkg.poly
 
         public virtual byte[] GetBytes()
         {
-            using MemoryStream stream = new MemoryStream();
+            using MemoryStream stream = new();
             MarshalBinary(stream);
             return stream.ToArray();
         }
 
         public virtual void SetBytes(byte[] bytes)
         {
-            using MemoryStream stream = new MemoryStream(bytes);
+            using MemoryStream stream = new(bytes);
             UnmarshalBinary(stream);
         }
 
@@ -94,6 +93,7 @@ namespace dkg.poly
                 return I * 31;
             }
         }
+
     }
 
     public class ShareComparer : IComparer<Share>
@@ -132,10 +132,14 @@ namespace dkg.poly
         // Returns the hash representation of this share
         public byte[] Hash()
         {
-            var h = SHA256.HashData(V.GetBytes());
-            var iBytes = BitConverter.GetBytes(I);
-            h = [.. h, .. iBytes];
-            return h;
+            Sha256Digest digest = new();
+            byte[] vBytes = V.GetBytes();
+            digest.BlockUpdate(vBytes, 0, vBytes.Length);
+            byte[] iBytes = BitConverter.GetBytes(I);
+            digest.BlockUpdate(iBytes, 0, iBytes.Length);
+            byte[] result = new byte[digest.GetDigestSize()];
+            digest.DoFinal(result, 0);
+            return result;
         }
 
         public override void MarshalBinary(Stream s)
@@ -201,10 +205,14 @@ namespace dkg.poly
         // Hash returns the hash representation of this share.
         public byte[] Hash()
         {
-            var h = SHA256.HashData(V.GetBytes());
-            var iBytes = BitConverter.GetBytes(I);
-            h = [.. h, .. iBytes];
-            return h;
+            Sha256Digest digest = new();
+            byte[] vBytes = V.GetBytes();
+            digest.BlockUpdate(vBytes, 0, vBytes.Length);
+            byte[] iBytes = BitConverter.GetBytes(I);
+            digest.BlockUpdate(iBytes, 0, iBytes.Length);
+            byte[] result = new byte[digest.GetDigestSize()];
+            digest.DoFinal(result, 0);
+            return result;
         }
         public override void MarshalBinary(Stream s)
         {

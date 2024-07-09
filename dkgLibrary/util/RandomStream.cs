@@ -23,18 +23,20 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
-using System.Security.Cryptography;
+using Org.BouncyCastle.Security;
+using System;
+using System.IO;
 
 namespace dkg.util
 {
-    // Class RandomStream implements a view random number generator as a stream
+    // Class RandomStream implements a secure random number generator as a stream
     public class RandomStream : Stream
     {
-        private RandomNumberGenerator _rng;
+        private readonly SecureRandom _rng;
 
         public RandomStream()
         {
-            _rng = RandomNumberGenerator.Create();
+            _rng = new SecureRandom();
         }
 
         public override bool CanRead => true;
@@ -58,8 +60,9 @@ namespace dkg.util
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            var data = new byte[count];
-            _rng.GetBytes(data);
+            // BouncyCastle's SecureRandom directly supports filling a byte array
+            byte[] data = new byte[count];
+            _rng.NextBytes(data);
             Array.Copy(data, 0, buffer, offset, count);
             return count;
         }
