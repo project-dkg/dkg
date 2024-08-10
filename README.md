@@ -1,5 +1,5 @@
-[![test](https://github.com/maxirmx/dkg/actions/workflows/test.yml/badge.svg)](https://github.com/maxirmx/dkg/actions/workflows/test.yml)
-[![CodeQL](https://github.com/maxirmx/dkg/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/maxirmx/dkg/actions/workflows/github-code-scanning/codeql)
+[![test](https://github.com/project-dkg/dkg/actions/workflows/test.yml/badge.svg)](https://github.com/project-dkg/dkg/actions/workflows/test.yml)
+[![CodeQL](https://github.com/project-dkg/dkg/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/project-dkg/dkg/actions/workflows/github-code-scanning/codeql)
 
 # Dkg
 Implementation in C# of a distributed key generation algorithm (Pedersen 91) with a K-of-N threshold scheme (Shamir scheme) on standard elliptic curves (Sec256k1 with an option to replace)
@@ -44,7 +44,7 @@ The C# solution includes three projects:
 - ```dkgSample/Program.cs``` -- асинхронная (многопоточная) реализация алгоритма распределённой генерации ключей и схемы Шамира в видк gRPC сервера. Задача синхронизации узлов в этом приложении не решалась, испльзуются временные задержки.
 
 ## Continuation project ... / Продолжение ...
-https://github.com/maxirmx/dkg-nodes
+https://github.com/project-dkg/dkg-nodes
 
 ## Project financing
 Initial development of this project was financed by [NarayanaSupramati](https://www.github.com/NarayanaSupramati)
