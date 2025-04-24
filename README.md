@@ -4,7 +4,7 @@
 # Dkg
 Implementation in C# of a distributed key generation algorithm (Pedersen 91) with a K-of-N threshold scheme (Shamir scheme) on standard elliptic curves (Sec256k1 with an option to replace)
 
-Реализация на c# алгоритма распределённой генерации ключей (Pedersen 91) с пороговой схемой K из N (схема Шамира) на стандартных эллиптических кривых (Sec256k1 c возможностью замены)
+Реализация на C# алгоритма распределённой генерации ключей (Pedersen 91) с пороговой схемой K из N (схема Шамира) на стандартных эллиптических кривых (Sec256k1 c возможностью замены)
 
 ## Theoretical basis/Теоретическая основа
 - Pedersen, T.P. (1991). A Threshold Cryptosystem without a Trusted Party. In: Davies, D.W. (eds) Advances in Cryptology — EUROCRYPT ’91. EUROCRYPT 1991. Lecture Notes in Computer Science, vol 547. Springer, Berlin, Heidelberg.
